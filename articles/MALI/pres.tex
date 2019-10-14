@@ -1,0 +1,153 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{metropolis}
+
+\usepackage{algorithm,algpseudocode}
+
+\title{Présentation - Implémentation d’un langage de programmation logique d’ordre supérieur avec MALI}
+\date{\today}
+\author{David Sreng, Basile Pesin}
+\institute{Faculté des Sciences de Sorbonne Université}
+
+\begin{document}
+\maketitle
+
+\section{L'algorithme d'Huet}
+
+\begin{frame}{Données en entrée}
+  Travaille sur des $\lambda$-termes bien typés
+  \begin{itemize}
+    \item $\eta$-expansés: $e \equiv \lambda x.(e x)$ (tous les corps d'abstractions de type atomiques)
+    \item $\beta$-réduits: $(\lambda x . e_1 e_2) \equiv e_1[e_2/x]$
+  \end{itemize}
+  Donc sous forme normale de tête : $\lambda x_1 \ldots x_n . (@ e_1 \ldots e_p)$
+
+  Une expression est flexible si la tête $@$ est une inconnue, rigide sinon
+\end{frame}
+
+\begin{frame}{SIMPL}
+  Avec un ensemble de paires à unifier $<e_1, e_2>$:
+  \begin{algorithmic}
+    \Procedure{SIMPL}{}
+    \If{$n = \emptyset$} (succès, $\emptyset$)
+    \EndIf
+    \State{TRIVIAL : unifier une paire $<var, expr>$ si trouvée, et reprendre}
+    \If{il n'y a pas de paire rigide-rigide} (succès, n)
+    \EndIf
+    \If{il y en a une $<\lambda x_1 \ldots x_n . (@_1 e_1^1 \ldots e_p^1), \lambda x_1 \ldots x_n . (@_2 e_1^2 \ldots e_p^2)>$}
+    \If{$@_1 \neq @_2$} (échec, $\emptyset$)
+    \Else
+    \State{Ajouter les $<\lambda x_1 \ldots x_n . e_i^1, \lambda x_1 \ldots x_n . e_i^2>$ à $n'$}
+    \EndIf
+    \EndIf
+    \EndProcedure
+  \end{algorithmic}
+\end{frame}
+
+\begin{frame}{MATCH}
+  Avec une paire flexible-rigide $<\lambda x_1 \ldots x_n . (v e_1^1 \ldots e_p^1), \lambda x_1 \ldots x_n . (@ e_1^2 \ldots e_p^2)>$\\
+ et avec $E_i$ = $(h_i w_1 \ldots w_{p_1})$, $h_i$ sont des nouvelles inconnues
+  \begin{algorithmic}
+    \Procedure{MATCH}{}
+    \If{$@$ est une constante}
+    \State{imitation : $<v, \lambda w_1 \ldots w_{p_1} . (@ E_1 \ldots E_{p_2})>$}
+    \EndIf
+    \For{$i$, en prenant en compte le type de $e_i^1$}
+    \State{projection : $<v, \lambda w_1 \ldots w_{p_1} . (w_i E_1 \ldots E_r)>$}
+    \EndFor
+    \EndProcedure
+  \end{algorithmic}
+
+  Phase non déterministe ! On génére plusieurs possibilités de substitutions à explorer
+\end{frame}
+
+\begin{frame}{Déroulement de l'algorithme}
+  Construction d'un arbre pour les termes $<e_1, e_2>$
+  \begin{algorithmic}
+    \Procedure{Unification}{}
+    \State{$root = SIMPL(<e_1, e_2>)$}
+    \While{il reste un noeud $p$ flexibles-rigide}
+    \State{$\Sigma = MATCH(p)$}
+    \State{On choisit $\sigma \in \Sigma$, et on fait $SIMPL(\sigma(p))$ pour obtenir un nouveau fils}
+    \EndWhile
+    \EndProcedure
+  \end{algorithmic}
+\end{frame}
+
+\section{Implémentation dans MALI}
+
+\begin{frame}{Compilation}
+  Etapes:
+  \begin{itemize}
+  \item Typage (et annotation) des termes
+  \item $\eta$-expansion statique
+  \item $\beta$-réduction statique
+  \item Production du code C : têtes de clauses deviennent structures, corps deviennent procédures
+  \end{itemize}
+  La transformation est secondaire, le plus gros du travail a lieu dans l'interpréteur C.
+\end{frame}
+
+\begin{frame}{Représentation des données}
+  La machine utilise une désignation (tas) : $Nom \rightarrow Terme$
+  avec le $Nom$ contenant la $Nature$ et la $Sorte$ (type)
+  \begin{itemize}
+  \item Atome
+  \item Construit
+  \item Nuplet : utilisé pour les abstractions (forme normale) et les applications
+  \item Variables
+  \item Variables à Attribut : l'Attribut permet de stocker le terme substitué
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Implémentation de l'unification}
+  SIMPL (déterministe) est écrite en C
+
+  MATCH (indéterministe) est implémenté dans le langage source ($\lambda$-Prolog / Z) avec Imitation et Projection des prédicats déterministes donnés.
+
+  \textbf{MATCH est bootstrap comme un ensemble de clauses du langage source}
+\end{frame}
+
+\begin{frame}{Interpréteur}
+  Depth-first search (comme pour Prolog).
+
+  Pile de recherche (contient l'état et les choix faits dans les cas indeterministes) avec opérations
+  \begin{itemize}
+    \item $Sauvegarde$ : Avant chaque instantiation d'une variable
+    \item $Reprendre$ : Au retour arrière, dépile un niveau de la pile
+  \end{itemize}
+
+  + Phases d'expansions et réduction dynamique (call-by-need) pour rester en forme normale
+\end{frame}
+
+\begin{frame}{Gestion de la mémoire}
+  Les substitutions sont coûteuses (on introduit des variables à attribut).
+
+  Opération $Reduire : Nom \rightarrow Nom$ : le paramètre est le $Nom$ du terme principal à garder (les autres termes utiles sont trouvés par parcours). Après la procédure, la désignation ne contient que le nom résultat.
+
+  On peut libérer:
+  \begin{itemize}
+    \item Les termes non protégés par $Reduire$, et non sauvegardés
+    \item Les termes sauvegardés dans sous-piles de recherches détruites (par retour-arrière ou cut)
+  \end{itemize}
+\end{frame}
+
+\section{Conclusion}
+
+\begin{frame}{Extensions de l'article}
+  Manque pour une implémentation de $\lambda$-Prolog:
+  \begin{itemize}
+    \item Implication
+    \item Polymorphisme
+    \item Plus d'optimisations
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{A retenir pour le projet}
+  \begin{itemize}
+    \item Unification (Algorithme de Huet)
+    \item Structures de données (pile de recherche)
+    \item $\eta$-expansion dynamique nécessaire
+    \item Garbage collector ? (en fonction du langage utilisé)
+  \end{itemize}
+\end{frame}
+
+\end{document}

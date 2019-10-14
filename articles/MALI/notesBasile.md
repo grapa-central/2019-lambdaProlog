@@ -40,14 +40,15 @@ Arbre d'unification pour e1, e2 :
 ## Utilisation de l'algo dans MALI
 
 - typage (+ annotation des termes)
-- η-expansion
+- η-expansion (y compris expansion dynamique en cas de changement de type après une unif de type)
 - β-reduction (les expansions et réductions se font "par nécessite", et effectuées pendant le parcours des termes)
 - production de code C : tetes de close transformées en structures, corps en procédures (via macros)
 
-Depth-first search
-Pour le backtracking : utilisation d'une pile de recherche. Avant chaque liaison d'une variable, on sauvegarde l'état et le choix fait.
+Dans le cas de l'ordre supérieur, on obtient un ensemble de paires flexibles-rigides apres SIMPL. Comme MATCH (indéterministe) est défini en Z dans MALI (avec Imitation et Projection des prédicats déterministes donnés), on fait des appels à MATCH pour ces paires (et ensuite on fait le corps de la clause). 
+Faire une vérification (unification) des types avant SIMPL.
 
-Dans le cas de l'ordre supérieur, on obtient un ensemble de paires flexibles-rigides apres SIMPL. Comme MATCH est défini en Z dans MALI, on fait des appels à MATCH pour ces paires (et ensuite on fait le corps de la clause). Faire une vérification (unification) des types avant SIMPL
+Depth-first search
+Pour le backtracking : utilisation d'une pile de recherche. Avant chaque liaison d'une variable, on Sauvegarde l'état et le choix fait. On peut utiliser Reprendre pour revenir en arrière (dépiler un terme de la pile de recherche)
 
 On peut aussi utiliser une procédure d'unification du premier ordre avant SIMPL, pour se débarrasser efficacement des termes du premier ordre.
 
@@ -60,12 +61,21 @@ Machine abstraite adaptée à la programmation logique avec GC.
 
 ### Représentation des données
 
-* Designation : Nom -> Terme (environnement dynamique)
+* Designation : Nom -> Terme (tas)
 * Nom : Nature * Sorte
   avec Nature : Atome | Construit | Nuplet | Variable | Variable a Attribut | Niveau
   et Sorte le type (seulement pour atomes, construits, variables)
 
-* NUplet utilisés pour représenter les abstractions et des applications.
-* Représentation explicite de tous les types (nécessaire pour MATCH)
+* NUplet utilisés pour représenter les abstractions (n+1 uplet avec n premier les variables et dernier le terme). Pour permettre la réécriture (expansion et reduction, codées dans des variables à attributs)
+* Représentation explicite de tous les types (nécessaire pour MATCH), mais avec tous les types atomiques réduit à un seul (en fait ce qui est important c'est fn / pas fn)
 
 Utilisation des variables à attribut pour représenter les affectations : la variable est remplacée par son attribut
+
+### GC
+En MALI, l'utilisateur appelle explicitement Réduire en passant en paramètre le Nom des termes encore utiles. Le récupérateur n'est alors que rarement déclenché. Idéalement soumettre les noms utiles au récup quand il y en a peu, mais souvent. 
+
+Ici à cause de la normalisation et des substitutions on consomme bcp de mémoire (variables à attribut). On doit appeler souvent le récupérateur.
+
+Mémoire à laquelle on perd accès :
+* Termes non protégés par l'appel à Réduire
+* Destruction des sous-piles de recherche lors du retour arrière, ou avec cut
