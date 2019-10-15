@@ -1,0 +1,24 @@
+#+TITLE: plan
+
+* Definitions
+** Variable liée, libre, meta
+** Typage simple
+** Substitutions
+* Unification
+** Unification des termes
+** Unification du λcalcul simple 1er ordre
+*** Pareil mais avec β(η)
+** ordre supérieur
+* Algo de Huet, 1er ordre
+** Long normale forme
+** Termes rigides / flexibles
+** Simplification (rigide-rigide)
+** Projection (rigide-flexible)
+** Imitation (rigide-flexible)
+** Terminaison (flexible-flexible)
+* Adaptation à l'ordre supérieur
+** Indécidabilité
+** Ajout de l'η-réduction, impact
+* Ouverture, implem
+** Indices de De Bruijn
+** Substitutions explicites
