@@ -75,6 +75,16 @@
 
 \section{Implémentation dans MALI}
 
+\begin{frame}
+  \textbf{Machine Adaptée aux Langages Indéterministes}
+  \begin{itemize}
+    \item Implémentée en C
+    \item Avec GC
+    \item Abstrait la pile de recherche
+    \item Représentation et parcours de termes
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Compilation}
   Etapes:
   \begin{itemize}
@@ -84,18 +94,33 @@
   \item Production du code C : têtes de clauses deviennent structures, corps deviennent procédures
   \end{itemize}
   La transformation est secondaire, le plus gros du travail a lieu dans l'interpréteur C.
+
+  ! Des phases d'expansions et de réduction dynamiques sont aussi nécessaires !
 \end{frame}
 
 \begin{frame}{Représentation des données}
   La machine utilise une désignation (tas) : $Nom \rightarrow Terme$
   avec le $Nom$ contenant la $Nature$ et la $Sorte$ (type)
   \begin{itemize}
-  \item Atome
-  \item Construit
+  \item Atome (constructible par l'utilisateur)
+  \item Construit (paires, ...)
   \item Nuplet : utilisé pour les abstractions (forme normale) et les applications
-  \item Variables
-  \item Variables à Attribut : l'Attribut permet de stocker le terme substitué
+  \item Variables (opération de substitution)
+  \item Variables à Attribut
   \end{itemize}
+\end{frame}
+
+\begin{frame}{Pourquoi la variable à attribut ?}
+  On fait des $\beta$-réduction et $\eta$-expansion dynamique $\rightarrow$ réécritures (qui doivent pouvoir être renversées lors d'un retour arrière)
+
+  \begin{itemize}
+    \item stocker un terme $t$ à réécrire dans une v.a. $x_t$ (au parcours on lira $t$)
+    \item si on doit réécrire $t \rightarrow t'$ on fait $substituer(x_t, t')$
+    \item alors au parcours de terme on lira $t'$
+    \item en cas de retour arrière, la substitution est automatiquement défaite
+  \end{itemize}
+
+  + v.a. utilisée pour stocker des informations (type des variables)
 \end{frame}
 
 \begin{frame}{Implémentation de l'unification}
@@ -114,12 +139,10 @@
     \item $Sauvegarde$ : Avant chaque instantiation d'une variable
     \item $Reprendre$ : Au retour arrière, dépile un niveau de la pile
   \end{itemize}
-
-  + Phases d'expansions et réduction dynamique (call-by-need) pour rester en forme normale
 \end{frame}
 
 \begin{frame}{Gestion de la mémoire}
-  Les substitutions sont coûteuses (on introduit des variables à attribut).
+  Les substitutions sont coûteuses en espace (+ réécritures)
 
   Opération $Reduire : Nom \rightarrow Nom$ : le paramètre est le $Nom$ du terme principal à garder (les autres termes utiles sont trouvés par parcours). Après la procédure, la désignation ne contient que le nom résultat.
 
