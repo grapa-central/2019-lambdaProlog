@@ -2,14 +2,32 @@
 \usetheme{metropolis}
 
 \usepackage{algorithm,algpseudocode}
+\usepackage{listings}
+\usepackage{graphicx}
 
 \title{Présentation - Implémentation d’un langage de programmation logique d’ordre supérieur avec MALI}
+\subtitle{Pascal Brisset, Novembre 1989}
 \date{\today}
 \author{David Sreng, Basile Pesin}
 \institute{Faculté des Sciences de Sorbonne Université}
 
 \begin{document}
+
+\input{lprologlang}
+\lstset{basicstyle=\tt\footnotesize, frame=single}
+
 \maketitle
+
+\begin{frame}{Motivations}
+  En 1989, l'interpréteur de $\lambda$-Prolog existant est écrit en Prolog, pas efficace pour des programmes réels
+
+  Développement d'un compilateur pour le langage Z, restriction de $\lambda$-Prolog:
+  \begin{itemize}
+    \item utilise des $\lambda$-termes typés
+    \item unification d'ordre supérieure
+    \item quantification universelle
+  \end{itemize}
+\end{frame}
 
 \section{L'algorithme d'Huet}
 
@@ -17,7 +35,7 @@
   Travaille sur des $\lambda$-termes bien typés
   \begin{itemize}
     \item $\eta$-expansés: $e \equiv \lambda x.(e x)$ (tous les corps d'abstractions de type atomiques)
-    \item $\beta$-réduits: $(\lambda x . e_1 e_2) \equiv e_1[e_2/x]$
+    \item $\beta$-réduits: $(\lambda x . e_1) e_2 \equiv e_1[e_2/x]$
   \end{itemize}
   Donc sous forme normale de tête : $\lambda x_1 \ldots x_n . (@ e_1 \ldots e_p)$
 
@@ -33,7 +51,7 @@
     \State{TRIVIAL : unifier une paire $<var, expr>$ si trouvée, et reprendre}
     \If{il n'y a pas de paire rigide-rigide} (succès, n)
     \EndIf
-    \If{il y en a une $<\lambda x_1 \ldots x_n . (@_1 e_1^1 \ldots e_p^1), \lambda x_1 \ldots x_n . (@_2 e_1^2 \ldots e_p^2)>$}
+    \If{il y en a une $<\lambda x_1 \ldots x_n . (@_1 e_1^1 \ldots e_{p_1}^1), \lambda x_1 \ldots x_n . (@_2 e_1^2 \ldots e_{p_2}^2)>$}
     \If{$@_1 \neq @_2$} (échec, $\emptyset$)
     \Else
     \State{Ajouter les $<\lambda x_1 \ldots x_n . e_i^1, \lambda x_1 \ldots x_n . e_i^2>$ à $n'$}
@@ -44,14 +62,14 @@
 \end{frame}
 
 \begin{frame}{MATCH}
-  Avec une paire flexible-rigide $<\lambda x_1 \ldots x_n . (v e_1^1 \ldots e_p^1), \lambda x_1 \ldots x_n . (@ e_1^2 \ldots e_p^2)>$\\
+  Avec une paire flexible-rigide $<\lambda x_1 \ldots x_n . (v e_1^1 \ldots e_{p_1}^1), \lambda x_1 \ldots x_n . (@ e_1^2 \ldots e_{p_2}^2)>$\\
  et avec $E_i$ = $(h_i w_1 \ldots w_{p_1})$, $h_i$ sont des nouvelles inconnues
   \begin{algorithmic}
     \Procedure{MATCH}{}
     \If{$@$ est une constante}
     \State{imitation : $<v, \lambda w_1 \ldots w_{p_1} . (@ E_1 \ldots E_{p_2})>$}
     \EndIf
-    \For{$i$, en prenant en compte le type de $e_i^1$}
+    \For{$i$, si $e_i^1$ : $\gamma_1 \rightarrow \ldots \rightarrow \gamma_r \rightarrow \beta$ ($\beta$ type de retour de $v$)}
     \State{projection : $<v, \lambda w_1 \ldots w_{p_1} . (w_i E_1 \ldots E_r)>$}
     \EndFor
     \EndProcedure
@@ -75,25 +93,31 @@
 
 \section{Implémentation dans MALI}
 
-\begin{frame}
+\begin{frame}{MALI}
   \textbf{Machine Adaptée aux Langages Indéterministes}
   \begin{itemize}
     \item Implémentée en C
     \item Avec GC
-    \item Abstrait la pile de recherche
+    \item Abstrait la pile de recherche (en profondeur)
     \item Représentation et parcours de termes
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Chaîne de compilation}
+  \begin{center}
+    \includegraphics[width=.5\paperwidth]{assets/mali-chain.png}
+  \end{center}
+\end{frame}
+
 \begin{frame}{Compilation}
-  Etapes:
-  \begin{itemize}
+  Etapes de compilation:
+  \begin{enumerate}
   \item Typage (et annotation) des termes
   \item $\eta$-expansion statique
   \item $\beta$-réduction statique
-  \item Production du code C : têtes de clauses deviennent structures, corps deviennent procédures
-  \end{itemize}
-  La transformation est secondaire, le plus gros du travail a lieu dans l'interpréteur C.
+  \item Production du code C (exemple plus loin)
+  \end{enumerate}
+  Compilateur écrit en Prolog, plus tard bootstrappé en Z.
 
   ! Des phases d'expansions et de réduction dynamiques sont aussi nécessaires !
 \end{frame}
@@ -101,13 +125,18 @@
 \begin{frame}{Représentation des données}
   La machine utilise une désignation (tas) : $Nom \rightarrow Terme$
   avec le $Nom$ contenant la $Nature$ et la $Sorte$ (type)
-  \begin{itemize}
-  \item Atome (constructible par l'utilisateur)
-  \item Construit (paires, ...)
-  \item Nuplet : utilisé pour les abstractions (forme normale) et les applications
-  \item Variables (opération de substitution)
-  \item Variables à Attribut
-  \end{itemize}
+  \begin{table}
+  \begin{tabular}{l|l|l}
+    Structure & Usage & Opérations\\
+    \hline
+    Atome & constantes, types atomiques & $Atom$ (construction) \\
+    Construit & types construits & $Cons$, $Car$, $Cdr$\\
+    N-uplet & abstractions, applications & $Nth$\\
+    Variable & variables, inconnue de type & $Substituer$\\
+    Variable à Attribut & abstractions, applications, inconnues & $SubstituerA$\\
+    \hline
+  \end{tabular}
+  \end{table}
 \end{frame}
 
 \begin{frame}{Pourquoi la variable à attribut ?}
@@ -123,22 +152,45 @@
   + v.a. utilisée pour stocker des informations (type des variables)
 \end{frame}
 
-\begin{frame}{Implémentation de l'unification}
+\begin{frame}[fragile]{Exemple de code C produit}
+  \begin{lstlisting}[language=lprolog]
+    type concat list A -> list A -> list A -> o.
+    concat [] X X.
+    concat [X|XS] Y [X|Z] :- concat XS Y Z.
+  \end{lstlisting}
+
+  \begin{lstlisting}[language=C,keywordstyle=\color{blue}\ttfamily]
+    typedef struct { Nom x; Nom y; Nom z; } concat_st;
+
+    void concat_proc1(concat_st *c) {
+      Unifier(c->x, Nil); Unifier(c->y, c->z);
+    }
+
+    void concat_proc2(concat_st *c) {
+      Nom x = Variable(); Nom xs = Variable(); Nom z = Variable();
+      Unifier(c->x, Cons(x, xs)); Unifier(c->z, Cons(x, z));
+      concat_st *c1 = malloc(); c1->x = xs; c1->y = c->y; c1->z = z;
+      Resoudre(c1);
+    }
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}{Exécution}
+  Depth-first search (appel à $Resoudre$ indeterministe, comme pour Prolog).
+
+  Pile de recherche (contient l'état et les choix faits dans les cas indeterministes) avec opérations
+  \begin{itemize}
+    \item $Sauvegarder$ : Avant chaque instantiation d'une variable
+    \item $Reprendre$ : Au retour arrière, dépile un niveau de la pile
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Spécificités de $\lambda$-Prolog}
   SIMPL (déterministe) est écrite en C
 
   MATCH (indéterministe) est implémenté dans le langage source ($\lambda$-Prolog / Z) avec Imitation et Projection des prédicats déterministes donnés.
 
   \textbf{MATCH est bootstrap comme un ensemble de clauses du langage source}
-\end{frame}
-
-\begin{frame}{Interpréteur}
-  Depth-first search (comme pour Prolog).
-
-  Pile de recherche (contient l'état et les choix faits dans les cas indeterministes) avec opérations
-  \begin{itemize}
-    \item $Sauvegarde$ : Avant chaque instantiation d'une variable
-    \item $Reprendre$ : Au retour arrière, dépile un niveau de la pile
-  \end{itemize}
 \end{frame}
 
 \begin{frame}{Gestion de la mémoire}
@@ -156,9 +208,11 @@
 \section{Conclusion}
 
 \begin{frame}{Extensions de l'article}
-  Manque pour une implémentation de $\lambda$-Prolog:
+  L'article décrit une implémentation efficace d'un langage dérivé de $\lambda$-Prolog.
+
+  Manquent pour une implémentation complète de $\lambda$-Prolog:
   \begin{itemize}
-    \item Implication
+    \item Implication (ajout dynamique de clauses)
     \item Polymorphisme
     \item Plus d'optimisations
   \end{itemize}
