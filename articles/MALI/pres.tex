@@ -2,14 +2,26 @@
 \usetheme{metropolis}
 
 \usepackage{algorithm,algpseudocode}
+\usepackage{graphicx}
 
 \title{Présentation - Implémentation d’un langage de programmation logique d’ordre supérieur avec MALI}
+\subtitle{Pascal Brisset, Novembre 1989}
 \date{\today}
 \author{David Sreng, Basile Pesin}
 \institute{Faculté des Sciences de Sorbonne Université}
 
 \begin{document}
 \maketitle
+
+\begin{frame}{Motivations}
+  En 1989, l'interpréteur de $\lambda$-Prolog est écrit en Prolog, pas efficace
+
+  Développement d'un compilateur pour le langage Z, inspiré de $\lambda$-Prolog:
+  \begin{itemize}
+    \item $\lambda$-termes typés
+    \item quantification universelle
+  \end{itemize}
+\end{frame}
 
 \section{L'algorithme d'Huet}
 
@@ -75,25 +87,31 @@
 
 \section{Implémentation dans MALI}
 
-\begin{frame}
+\begin{frame}{MALI}
   \textbf{Machine Adaptée aux Langages Indéterministes}
   \begin{itemize}
     \item Implémentée en C
     \item Avec GC
-    \item Abstrait la pile de recherche
+    \item Abstrait la pile de recherche (en profondeur)
     \item Représentation et parcours de termes
   \end{itemize}
 \end{frame}
 
+\begin{frame}{Chaîne de compilation}
+  \begin{center}
+    \includegraphics[width=.5\paperwidth]{assets/mali-chain.png}
+  \end{center}
+\end{frame}
+
 \begin{frame}{Compilation}
-  Etapes:
-  \begin{itemize}
+  Etapes de compilation:
+  \begin{enumerate}
   \item Typage (et annotation) des termes
   \item $\eta$-expansion statique
   \item $\beta$-réduction statique
   \item Production du code C : têtes de clauses deviennent structures, corps deviennent procédures
-  \end{itemize}
-  La transformation est secondaire, le plus gros du travail a lieu dans l'interpréteur C.
+  \end{enumerate}
+  Compilateur écrit en Prolog, plus tard bootstrappé en Z.
 
   ! Des phases d'expansions et de réduction dynamiques sont aussi nécessaires !
 \end{frame}
@@ -101,13 +119,18 @@
 \begin{frame}{Représentation des données}
   La machine utilise une désignation (tas) : $Nom \rightarrow Terme$
   avec le $Nom$ contenant la $Nature$ et la $Sorte$ (type)
-  \begin{itemize}
-  \item Atome (constructible par l'utilisateur)
-  \item Construit (paires, ...)
-  \item Nuplet : utilisé pour les abstractions (forme normale) et les applications
-  \item Variables (opération de substitution)
-  \item Variables à Attribut
-  \end{itemize}
+  \begin{table}
+  \begin{tabular}{l|l|l}
+    Structure & Usage & Opérations\\
+    \hline
+    Atome & constantes, types atomiques & $Atom$ (construction) \\
+    Construit & types construits & $Cons$, $Car$, $Cdr$\\
+    N-uplet & abstractions, applications & $Nth$\\
+    Variable & variables, inconnue de type & $Substituer$\\
+    Variable à Attribut & abstractions, applications, inconnues & $SubstituerA$\\
+    \hline
+  \end{tabular}
+  \end{table}
 \end{frame}
 
 \begin{frame}{Pourquoi la variable à attribut ?}
