@@ -35,7 +35,7 @@
   Travaille sur des $\lambda$-termes bien typés
   \begin{itemize}
     \item $\eta$-expansés: $e \equiv \lambda x.(e x)$ (tous les corps d'abstractions de type atomiques)
-    \item $\beta$-réduits: $(\lambda x . e_1 e_2) \equiv e_1[e_2/x]$
+    \item $\beta$-réduits: $(\lambda x . e_1) e_2 \equiv e_1[e_2/x]$
   \end{itemize}
   Donc sous forme normale de tête : $\lambda x_1 \ldots x_n . (@ e_1 \ldots e_p)$
 
@@ -51,7 +51,7 @@
     \State{TRIVIAL : unifier une paire $<var, expr>$ si trouvée, et reprendre}
     \If{il n'y a pas de paire rigide-rigide} (succès, n)
     \EndIf
-    \If{il y en a une $<\lambda x_1 \ldots x_n . (@_1 e_1^1 \ldots e_p^1), \lambda x_1 \ldots x_n . (@_2 e_1^2 \ldots e_p^2)>$}
+    \If{il y en a une $<\lambda x_1 \ldots x_n . (@_1 e_1^1 \ldots e_{p_1}^1), \lambda x_1 \ldots x_n . (@_2 e_1^2 \ldots e_{p_2}^2)>$}
     \If{$@_1 \neq @_2$} (échec, $\emptyset$)
     \Else
     \State{Ajouter les $<\lambda x_1 \ldots x_n . e_i^1, \lambda x_1 \ldots x_n . e_i^2>$ à $n'$}
@@ -62,14 +62,14 @@
 \end{frame}
 
 \begin{frame}{MATCH}
-  Avec une paire flexible-rigide $<\lambda x_1 \ldots x_n . (v e_1^1 \ldots e_p^1), \lambda x_1 \ldots x_n . (@ e_1^2 \ldots e_p^2)>$\\
+  Avec une paire flexible-rigide $<\lambda x_1 \ldots x_n . (v e_1^1 \ldots e_{p_1}^1), \lambda x_1 \ldots x_n . (@ e_1^2 \ldots e_{p_2}^2)>$\\
  et avec $E_i$ = $(h_i w_1 \ldots w_{p_1})$, $h_i$ sont des nouvelles inconnues
   \begin{algorithmic}
     \Procedure{MATCH}{}
     \If{$@$ est une constante}
     \State{imitation : $<v, \lambda w_1 \ldots w_{p_1} . (@ E_1 \ldots E_{p_2})>$}
     \EndIf
-    \For{$i$, en prenant en compte le type de $e_i^1$}
+    \For{$i$, si $e_i^1$ : $\gamma_1 \rightarrow \ldots \rightarrow \gamma_r \rightarrow \beta$ ($\beta$ type de retour de $v$)}
     \State{projection : $<v, \lambda w_1 \ldots w_{p_1} . (w_i E_1 \ldots E_r)>$}
     \EndFor
     \EndProcedure
