@@ -1,0 +1,370 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Beamer Presentation
+% LaTeX Template
+% Version 1.0 (10/11/12)
+%
+% This template has been downloaded from:
+% http://www.LaTeXTemplates.com
+%
+% License:
+% CC BY-NC-SA 3.0 (http://creativecommons.org/licenses/by-nc-sa/3.0/)
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%----------------------------------------------------------------------------------------
+%	PACKAGES AND THEMES
+%----------------------------------------------------------------------------------------
+
+\documentclass{beamer}
+
+\usepackage{proof}
+\mode<presentation> {
+
+% The Beamer class comes with a number of default slide themes
+% which change the colors and layouts of slides. Below this is a list
+% of all the themes, uncomment each in turn to see what they look like.
+
+%\usetheme{default}
+%\usetheme{AnnArbor}
+%\usetheme{Antibes}
+%\usetheme{Bergen}
+%\usetheme{Berkeley}
+%\usetheme{Berlin}
+%\usetheme{Boadilla}
+%\usetheme{CambridgeUS}
+%\usetheme{Copenhagen}
+%\usetheme{Darmstadt}
+%\usetheme{Dresden}
+%\usetheme{Frankfurt}
+%\usetheme{Goettingen}
+%\usetheme{Hannover}
+%\usetheme{Ilmenau}
+%\usetheme{JuanLesPins}
+%\usetheme{Luebeck}
+\usetheme{Madrid}
+%\usetheme{Malmoe}
+%\usetheme{Marburg}
+%\usetheme{Montpellier}
+%\usetheme{PaloAlto}
+%\usetheme{Pittsburgh}
+%\usetheme{Rochester}
+%\usetheme{Singapore}
+%\usetheme{Szeged}
+%\usetheme{Warsaw}
+
+% As well as themes, the Beamer class has a number of color themes
+% for any slide theme. Uncomment each of these in turn to see how it
+% changes the colors of your current slide theme.
+
+%\usecolortheme{albatross}
+%\usecolortheme{beaver}
+%\usecolortheme{beetle}
+%\usecolortheme{crane}
+%\usecolortheme{dolphin}
+%\usecolortheme{dove}
+%\usecolortheme{fly}
+%\usecolortheme{lily}
+%\usecolortheme{orchid}
+%\usecolortheme{rose}
+%\usecolortheme{seagull}
+%\usecolortheme{seahorse}
+%\usecolortheme{whale}
+%\usecolortheme{wolverine}
+
+%\setbeamertemplate{footline} % To remove the footer line in all slides uncomment this line
+%\setbeamertemplate{footline}[page number] % To replace the footer line in all slides with a simple slide count uncomment this line
+
+%\setbeamertemplate{navigation symbols}{} % To remove the navigation symbols from the bottom of all slides uncomment this line
+}
+\usepackage{qtree}
+\usepackage{amsmath}
+\usepackage{ragged2e}
+\usepackage[linguistics]{forest}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{mydefinition}{Définition}
+
+\begin{document}
+
+\begin{frame}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=3cm]{su.png}%
+\end{figure}
+\title[Rapport]{Unification d'ordre supérieur: L'algorithme d'Huet}
+% The short title appears at the bottom of every slide, the full title is only on the title page
+
+%\begin{figure}[ht]
+ %   \centering
+  %  {\includegraphics[width=7cm]{jeu.jpg}}
+   % \label{fig:example}%
+%\end{figure}
+
+
+
+
+\author{ Matthieu Eyraud, Hector Suzanne }% Your name
+% Your institution as it will appear on the bottom of every slide, may be shorthand to save space
+
+\titlepage % Print the title page as the first slide
+
+G. Huet, 1975: A unification algorithm for typed $\lambda$-calculus, \emph{Th.Comp.Sc.}
+
+G. Dowek, 2001: Higher-Order Unification and Matching (Handbook of Automated Reasoning), \emph{Elsevier}
+
+
+\end{frame}
+
+\begin{frame}{Définitions}
+\begin{itemize}
+    \item $\lambda$-calcul simplement typé
+        \begin{align*}
+            t ::= & \lambda(x : A) t & & \textit{Abstraction (simpl. typée)} \\
+            &|\ (t\ t) & & \textit{Application} \\
+            &|\ x  & & \textit{Variables} \\
+            &|\ X & & \textit{Constantes} \\
+        \end{align*}
+    \item Substitutions (par induction)
+        \begin{align*}
+            Y[t/x] &= Y & & \textit{Constantes} \\
+            x[t/x] &=
+                \begin{cases}
+                    t & \text{cette occurrence de $x$ est libre} \\
+                    x & \text{cette occurrence de $x$ est liée}
+                \end{cases}
+                & & \textit{Variables}
+        \end{align*}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Forme normale longue}
+\begin{mydefinition}
+    $$t = \lambda x_1 \ldots \lambda x_m\ (y\ u_1 \ldots u_p) : T_1 \rightarrow \ldots \rightarrow T_n \rightarrow U$$
+    avec $U$ atomique. Sa forme normale longue (FNL) est le terme
+    $$ \dot{t} = \lambda x_1 \ldots \lambda x_m\ \lambda x_{m+1} \ldots \lambda x_n\ (y\ \dot{u_1} \ldots \dot{u_p}\ x_{m+1} \ldots x_n) $$
+\end{mydefinition}
+\begin{itemize}
+    \item Exemples \\
+    \begin{tabular}{l c}
+        $\lambda( f : a \rightarrow b). \textcolor{red}{f}$ &
+        $: (a\rightarrow b)\rightarrow a \rightarrow b$ \\
+        $\lambda( f : a \rightarrow b). \ \textcolor{red}{\lambda (x : a).f\ x}$ &
+        $:(a\rightarrow b)\rightarrow a \rightarrow b$
+    \end{tabular}
+    \item Terme rigide, Terme flexible \\
+        $\dot{t}$ est \emph{rigide} si $y$ est une constante du langage, et \emph{flexible} sinon.
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Unification}
+$$  t = \lambda x. (y \ x \ (\lambda z. z))
+\longrightarrow \lambda x. (K \ x \ (\lambda d. d))
+\longleftarrow  \lambda x. (K \ x \ (\lambda c. c)) = u $$
+\begin{itemize}
+    \item Solutions $\sigma$ de support $\text{fv}(t) \cup \text{fv}(u)$, telle que 
+    $ t \sigma = u \sigma $
+    \item Minimalité: $ \sigma \leq \tau$ quand $\tau = \upsilon \circ \sigma $
+    \item Unificateur le plus général (MGU) $\sigma^{*}$
+    $$ t\sigma^{*} = u\sigma^{*} $$
+    $$ t\tau = u\tau \Longleftrightarrow \sigma^{*} \leq \tau $$
+\end{itemize}
+\end{frame}{}
+
+\begin{frame}{Problème d'unification}
+    \begin{itemize}
+        \item Ordre 1
+        \begin{itemize}
+            \item $\sigma$ restreinte au termes de type $*$
+            \item Résolu par unification de terme + $\beta \eta$-réduction
+            \item Existence d'unificateur maximaux (MGU)
+        \end{itemize}
+        \item On peut unifier les $\lambda$-termes comme termes simple
+        \item Mais avec la $\beta \eta$-réduction?
+        \item Ordre supérieur
+        \begin{itemize}
+            \item Valeur et unicité du MGU indécidables
+            \item Existence d'un unificateur?
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+
+\begin{frame}{Unification d'ordre supérieure}
+\begin{itemize}
+    \item Soit $A = \left\{ \left< t, u \right>,\dots \right\}$ 
+        une \emph{liste de conflit},
+    \item et $fv(A) = \bigcup\limits_{\left< t, u \right> \in A} \text{fv}(t) \cup \text{fv}(u)$.
+\end{itemize}
+
+\begin{mydefinition}
+    Le problème de \emph{l'unification d'ordre supérieur} consiste à décider si, pour $A$ donné,
+$$\exists \sigma, \ \forall \left< t, u \right> \in A, \ \exists s, \ t \sigma \xrightarrow{\beta \eta} s \xleftarrow{\beta \eta} u_i \sigma $$
+\end{mydefinition}
+\end{frame}
+
+\begin{frame}{Algortihme d'Huet}
+    L'algorithme d'Huet décide l'unification d'ordre supérieure. 
+    \begin{itemize}
+        \item Invariant: $A$, une liste de conflit
+        \item On réduit $A$ en alternant des phases administratives... \dots
+        \begin{itemize}
+            \item Evaluation par $\beta$, $\eta$, $\eta^{-1}$
+            \item Unification $\left< x, t \right> \rightarrow [t/x]$ 
+                si $x \notin \text{fv}(t)$
+            \item[\Rightarrow] Passage en \emph{forme normale longue}
+        \end{itemize}
+        \item et les branchements sur une paire de conflit
+        \begin{itemize}
+            \item rigide-rigide, et on la \emph{simplifie}
+            \item flexible-rigide, et on "devine" un accord (\emph{match})
+            \item flexible-flexible, et on conclue
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Equations rigide-rigide}
+Le symbole de tête est différent
+\[ \infer[\textsc{fail}]
+{\bot}
+{E \cup \{ \lambda x_1 \ldots \lambda x_n \ (\textcolor{red}{f} \ u_1 \ldots u_p) = \lambda x_1 \ldots \lambda x_n \ (\textcolor{red}{g} \ v_1 \ldots v_q) \}}
+\]
+
+Le symbole de tête est identique
+
+\[ \infer[\textsc{simpl}]
+{E \cup \left\{ \lambda \vec{x} \ (\textcolor{red}{f}\ \textcolor{blue}{u_1} \ldots \textcolor{green}{u_p}) = \lambda \vec{x}\ (\textcolor{red}{f} \ \textcolor{blue}{v_1} \ldots \textcolor{green}{v_p}) \right\} }
+{E \cup \{\textcolor{blue}{\lambda \vec{x}\  u_1  = \lambda \vec{x}\ v_1}, \ldots, \textcolor{green}{\lambda \vec{x}\  u_p = \lambda \vec{x}\ v_p}\}}
+\]
+
+\end{frame}
+
+\begin{frame}{Equations flexible-rigide}
+\[ \infer[\textsc{match}]
+{A[\lambda y_1 \ldots \lambda y_p\ (h\ (H_1\ y_1 \ldots y_p) \ldots (H_r\ y_1 \ldots y_p))/x)]}
+{A = E \cup \{\lambda x_1 \ldots \lambda x_n\ (x \ u_1 \ldots u_p) = \lambda x_1 \ldots \lambda x_n\ (f\ v_1 \ldots v_q)\}}
+\]
+
+On a le choix du symbole de tête h.
+\begin{itemize}
+    \item Si le symbole $f$ est une constante $F$, alors on restreint $h$ à $y_1 \ldots y_p,f$ (imitation).
+    \item Sinon, $h$ est un des symboles $y_1 \ldots y_p$ (projection).
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Equations flexible-flexible}
+On n'a aucun moyen de restreindre l'espace de recherche dans ce cas-là. On se retrouve à faire une énumération de toutes les solutions possibles.
+\newtheorem{huetsaid}{Théorème (Huet)}
+        \begin{huetsaid}
+         Une liste de paire de conflit en forme normale longue, dont tout les têtes sont flexibles, admet un unificateur
+        \end{huetsaid}
+Donc si l'on est uniquement intéressé par l'existence d'unificateur, on peut s'arrêter à partir du moment où les équations sont toutes flexibles flexibles.
+
+\end{frame}
+
+
+
+\begin{frame}{Exemple d'un matching tree}
+
+\begin{minipage}{0.5\textwidth}
+\begin{figure}[H]
+\includegraphics[width=70mm]{images/step1.png}
+\caption{\label{fig:blue_rectangle0} Première étape}
+\end{figure}
+\end{minipage} \hfill
+\begin{minipage}{0.45\textwidth}
+\begin{itemize}
+\item La deuxième équation est flexible rigide, on applique donc la règle $Match$ qui énumère les substitutions possibles
+\item La forme des substitutions est la suivante: $\lambda w. head (h(w))$ (x est une fonction d'arité 1).
+\item Le symbole de head $h$ choisi ici peut être soit $w$, soit $B$
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Exemple d'un matching tree - 2}
+
+\begin{minipage}{0.5\textwidth}
+\begin{figure}[H]
+\includegraphics[width=70mm]{images/Step2.png}
+\caption{\label{fig:blue_rectangle1} Deuxième étape}
+\end{figure}
+\end{minipage} \hfill
+\begin{minipage}{0.45\textwidth}
+\begin{itemize}
+\item A droite, on obtient les paires $\{<y,y>,$\\
+$<B(h(B)), B(y)>\}$ qui après simplification par la règle $Simplify$ nous donnent deux équations flexibles flexibles.
+\item A gauche, on a une équation flexible rigide et une unique substitution pour $y$, on continue avec $Match$
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+\begin{frame}{Exemple d'un matching tree - 3}
+
+\begin{minipage}{0.5\textwidth}
+\begin{figure}[H]
+\includegraphics[width=70mm]{images/step3.png}
+\caption{\label{fig:blue_rectangle2} Troisième étape}
+\end{figure}
+\end{minipage} \hfill
+\begin{minipage}{0.45\textwidth}
+\begin{itemize}
+\item On génère une nouvelle fois les substitutions possibles avec $Match$.
+\item A chaque étape, une des deux équations est flexible rigide et ce schéma se répète indéfiniment.
+\end{itemize}
+\end{minipage}
+\end{frame}
+
+
+\begin{frame}{Gestion des captures}
+\begin{itemize}
+    \item On cherche à éviter les problèmes de capture de variables lors des substitutions pour pouvoir simplifier des équations de la forme $\lambda x\ u = \lambda x\ v$ en $u = v$.
+    \item Considérons l'exemple suivant: $\lambda x\ Y = \lambda x\ (f\ x\ x)$
+    \item En appliquant la simplification voulue, on obtient $Y = (f\ x\ x)$ qui a une solution !
+\end{itemize}
+\vspace{1\baselineskip}
+$\rightarrow$ Il faut trouver une manière de connaître les variables non disponibles pour la substitution 
+\end{frame}
+
+
+\newcommand{\go}{\text{go}}
+\newtheorem{exemple}{Exemple}
+\begin{frame}{Indices de De Bruijn}
+ $$ t ::= \lambda \ | \ (t\ t) \ | \ n \ | \ x \ | \ X$$
+\begin{exemple}
+    $$\lambda x \lambda y (x\ \lambda z (x\ z)) 
+    \xrightarrow{\text{DeBruijn}} 
+    \lambda \lambda (1 \ \lambda (2 \ 0))$$
+\end{exemple}
+\begin{itemize}
+    \item On peut librement substituer les variables, nécessairement libres !
+    \item Techniques du premier ordre (plus efficaces)
+\end{itemize}
+\begin{align*}
+     DeBruijn(t) &= \go \ t \ \varepsilon \\
+     \go \ (t \ u) \ \rho &= ((\go \ t \ \rho) \ (\go \ u \ \rho)) \\
+     \go \ (\lambda x. t) \ \rho &= \lambda \ (go \ t \ (x :: \rho)) \\
+     \go \ x \ \rho &= (\text{index} \ x \ \rho) \ ?? \ x \\
+ \end{align*}
+\end{frame}
+
+\begin{frame}{Substitutions explicites}
+\begin{itemize}
+    \item Traiter la substitution comme une opération à part entière du calcul et lui adjoindre des règles.
+    \item La règle de $\beta$-réduction devient $((\lambda x\ t)\ u) \rhd [u/x]t$ (on retarde la substitution)
+    \item Il faut également ajouter une règle de distribution de substitution : $[\sigma](t\ u) \rhd ([\sigma]t\ [\sigma]u)$
+\end{itemize}
+\vspace{1\baselineskip}
+\begin{itemize}
+    \item[] Exemple: si on a un terme $((\lambda x\ Y)\ a)$ alors on va obtenir le terme $[a/x]Y$. 
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Conclusion}
+    \begin{itemize}
+        \item L'algorithme d'Huet bien qu'il soit semi-décidable a de bonnes propriétés de convergence.
+        \item Possible de l'améliorer et d'identifier des sous-cas particuliers décidables (l'algorithme d'Huet peut boucler sur des problèmes d'unification d'ordre 1).
+        \item On peut utiliser les indices de De Bruijn ou les substitutions explicites pour une meilleure gestion des captures de variables et pour pouvoir utiliser des techniques de premier ordre pour l'unification.
+    \end{itemize}
+\end{frame}
+
+\end{document}
