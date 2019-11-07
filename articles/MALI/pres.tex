@@ -2,6 +2,7 @@
 \usetheme{metropolis}
 
 \usepackage{algorithm,algpseudocode}
+\usepackage{listings}
 \usepackage{graphicx}
 
 \title{Présentation - Implémentation d’un langage de programmation logique d’ordre supérieur avec MALI}
@@ -11,6 +12,10 @@
 \institute{Faculté des Sciences de Sorbonne Université}
 
 \begin{document}
+
+\input{lprologlang}
+\lstset{basicstyle=\tt\footnotesize, frame=single}
+
 \maketitle
 
 \begin{frame}{Motivations}
@@ -109,7 +114,7 @@
   \item Typage (et annotation) des termes
   \item $\eta$-expansion statique
   \item $\beta$-réduction statique
-  \item Production du code C : têtes de clauses deviennent structures, corps deviennent procédures
+  \item Production du code C (exemple plus loin)
   \end{enumerate}
   Compilateur écrit en Prolog, plus tard bootstrappé en Z.
 
@@ -146,22 +151,45 @@
   + v.a. utilisée pour stocker des informations (type des variables)
 \end{frame}
 
-\begin{frame}{Implémentation de l'unification}
+\begin{frame}[fragile]{Exemple de code C produit}
+  \begin{lstlisting}[language=lprolog]
+    type concat list A -> list A -> list A -> o.
+    concat [] X X.
+    concat [X|XS] Y [X|Z] :- concat XS Y Z.
+  \end{lstlisting}
+
+  \begin{lstlisting}[language=C,keywordstyle=\color{blue}\ttfamily]
+    typedef struct { Nom x; Nom y; Nom z; } concat_st;
+
+    void concat_proc1(concat_st *c) {
+      Unifier(c->x, Nil); Unifier(c->y, c->z);
+    }
+
+    void concat_proc2(concat_st *c) {
+      Nom x = Variable(); Nom xs = Variable(); Nom z = Variable();
+      Unifier(c->x, Cons(x, xs)); Unifier(c->z, Cons(x, z));
+      concat_st *c1 = malloc(); c1->x = xs; c1->y = c->y; c1->z = z;
+      Resoudre(c1);
+    }
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}{Exécution}
+  Depth-first search (appel à $Resoudre$ indeterministe, comme pour Prolog).
+
+  Pile de recherche (contient l'état et les choix faits dans les cas indeterministes) avec opérations
+  \begin{itemize}
+    \item $Sauvegarder$ : Avant chaque instantiation d'une variable
+    \item $Reprendre$ : Au retour arrière, dépile un niveau de la pile
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Spécificités de $\lambda$-Prolog}
   SIMPL (déterministe) est écrite en C
 
   MATCH (indéterministe) est implémenté dans le langage source ($\lambda$-Prolog / Z) avec Imitation et Projection des prédicats déterministes donnés.
 
   \textbf{MATCH est bootstrap comme un ensemble de clauses du langage source}
-\end{frame}
-
-\begin{frame}{Interpréteur}
-  Depth-first search (comme pour Prolog).
-
-  Pile de recherche (contient l'état et les choix faits dans les cas indeterministes) avec opérations
-  \begin{itemize}
-    \item $Sauvegarde$ : Avant chaque instantiation d'une variable
-    \item $Reprendre$ : Au retour arrière, dépile un niveau de la pile
-  \end{itemize}
 \end{frame}
 
 \begin{frame}{Gestion de la mémoire}
