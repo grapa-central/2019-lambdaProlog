@@ -19,11 +19,12 @@
 \maketitle
 
 \begin{frame}{Motivations}
-  En 1989, l'interpréteur de $\lambda$-Prolog est écrit en Prolog, pas efficace
+  En 1989, l'interpréteur de $\lambda$-Prolog existant est écrit en Prolog, pas efficace pour des programmes réels
 
-  Développement d'un compilateur pour le langage Z, inspiré de $\lambda$-Prolog:
+  Développement d'un compilateur pour le langage Z, restriction de $\lambda$-Prolog:
   \begin{itemize}
-    \item $\lambda$-termes typés
+    \item utilise des $\lambda$-termes typés
+    \item unification d'ordre supérieure
     \item quantification universelle
   \end{itemize}
 \end{frame}
@@ -207,9 +208,11 @@
 \section{Conclusion}
 
 \begin{frame}{Extensions de l'article}
-  Manque pour une implémentation de $\lambda$-Prolog:
+  L'article décrit une implémentation efficace d'un langage dérivé de $\lambda$-Prolog.
+
+  Manquent pour une implémentation complète de $\lambda$-Prolog:
   \begin{itemize}
-    \item Implication
+    \item Implication (ajout dynamique de clauses)
     \item Polymorphisme
     \item Plus d'optimisations
   \end{itemize}
