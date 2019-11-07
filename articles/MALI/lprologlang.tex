@@ -1,0 +1,23 @@
+\lstdefinelanguage{lprolog}{%
+   columns=fullflexible,%
+   % keywordstyle=\bfseries,
+   commentstyle=\slshape,%
+   keywords={%
+    type
+   },%
+   keywordstyle={\color{blue}\sffamily},%
+   morekeywords=[2]{%
+     list
+   },%
+   keywordstyle=[2]{\color{black}\sffamily},%
+   classoffset=2,%
+   sensitive,%
+   comment=[l]\#,%
+   morestring=[d]",%"
+   escapechar=\$,
+   literate=*{->}{{$\rightarrow$}}1
+   {\\}{{\color{blue}\sffamily$\lambda$}}1
+   {=>}{{$\Rightarrow$}}1,%
+   showlines=true,
+   frame=single,
+}[keywords,comments,strings]%
