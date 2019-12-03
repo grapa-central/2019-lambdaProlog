@@ -1,4 +1,4 @@
-(ns clj-lprolog.core
+(ns clj-lprolog.core-test
   (:require [clj-lprolog.core :as sut]
             [clojure.test :as t]))
 
