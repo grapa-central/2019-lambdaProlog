@@ -38,3 +38,31 @@
   (t/is (syn/kernel-term? 'A))
   (t/is (syn/kernel-term? '(λ 2 (1 0))))
   (t/is (syn/kernel-term? '(A B))))
+
+(t/deftest type-var?-test
+  (t/testing "positive"
+    (t/is (syn/type-var? 'A)))
+  (t/testing "negative"
+    (t/is (not (syn/type-var? 'a)))
+    (t/is (not (syn/type-var? '())))))
+
+(t/deftest prop-type?-test
+  (t/testing "positive"
+    (t/is (syn/prop-type? 'o)))
+  (t/testing "negative"
+    (t/is (not (syn/prop-type? 'O)))
+    (t/is (not (syn/prop-type? '())))))
+
+(t/deftest arrow-type?-test
+  (t/testing "positive"
+    (t/is (syn/arrow-type? '(-> A o)))
+    (t/is (syn/arrow-type? '(-> (-> A B) A B))))
+  (t/testing "negative"
+    (t/is (not (syn/arrow-type? 'A)))
+    (t/is (not (syn/arrow-type? '(-> A))))
+    (t/is (not (syn/arrow-type? '(-> A ()))))))
+
+(t/deftest proper-type?-test
+  (t/is (syn/proper-type? 'o))
+  (t/is (syn/proper-type? 'A))
+  (t/is (syn/proper-type? '(-> (-> A o) A o))))

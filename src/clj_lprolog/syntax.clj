@@ -1,5 +1,6 @@
 (ns clj-lprolog.syntax
-  "Kernel syntax with De Bruijn indexes")
+  "Kernel syntax"
+  (:require [clojure.string :as str]))
 
 ;;{
 ;; # Kernel terms
@@ -43,3 +44,36 @@
           (free? t)
           (lambda? t)
           (application? t)))
+
+;;{
+;; # Type syntax
+;;
+;; A type is either
+;; - a type variable (identified by an capitalized symbol)
+;; - the primitive "prop" type `o`
+;; - a n-ary arrow type
+;;}
+
+(declare proper-type?)
+
+(defn type-var?
+  "Is `t` a type variable ?"
+  [t] (and (symbol? t)
+           (= (symbol (str/capitalize t)) t)))
+
+(defn prop-type?
+  "Is `t` the proposition type ?"
+  [t] (= t 'o))
+
+(defn arrow-type?
+  "Is `t` an arrow type ?"
+  [t] (and (seq? t)
+           (> (count t) 2)
+           (= (first t) '->)
+           (every? proper-type? (rest t))))
+
+(defn proper-type?
+  "Is `t` a proper type ?"
+  [t] (or (type-var? t)
+          (prop-type? t)
+          (arrow-type? t)))
