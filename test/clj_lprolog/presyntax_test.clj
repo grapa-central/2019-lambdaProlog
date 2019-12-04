@@ -2,6 +2,8 @@
   (:require [clj-lprolog.presyntax :as syn]
             [clojure.test :as t]))
 
+;; Tests on user terms syntax
+
 (t/deftest bound?-test
   (t/testing "positive"
     (t/is (syn/bound? 'a)))
@@ -14,6 +16,7 @@
   (t/testing "positive"
     (t/is (syn/free? 'A)))
   (t/testing "negative"
+    (t/is (not (syn/free? 'O)))
     (t/is (not (syn/free? 'a)))
     (t/is (not (syn/free? ())))))
 
@@ -34,6 +37,7 @@
 (t/deftest parse-test
   (t/testing "successful parsing"
     (t/is (= (syn/parse '(λ [x y] (x y))) '(λ 2 (0 1))))
+    (t/is (= (syn/parse '(λ [x y] (+ x y))) '(λ 2 (+ 0 1))))
     (t/is (= (syn/parse '(λ [x] (A x))) '(λ 1 (A 0))))
     (t/is (= (syn/parse '((λ [x y] (x y)) (λ [x] x))) '((λ 2 (0 1)) (λ 1 0)))))
   (t/testing "failed parsing"

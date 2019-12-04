@@ -2,6 +2,8 @@
   (:require [clj-lprolog.syntax :as syn]
             [clojure.test :as t]))
 
+;; Tests on kernel terms syntax
+
 (t/deftest bound?-test
   (t/testing "positive"
     (t/is (syn/bound? 42)))
@@ -14,8 +16,17 @@
   (t/testing "positive"
     (t/is (syn/free? 'A)))
   (t/testing "negative"
+    (t/is (not (syn/free? 'S)))
     (t/is (not (syn/free? 12)))
     (t/is (not (syn/free? ())))))
+
+(t/deftest primitive?-test
+  (t/testing "positive"
+    (t/is (syn/primitive? 'S))
+    (t/is (syn/primitive? '+)))
+  (t/testing "negative"
+    (t/is (not (syn/primitive? '∀)))
+    (t/is (not (syn/primitive? 'λ)))))
 
 (t/deftest lambda?-test
   (t/testing "positive"
@@ -39,12 +50,21 @@
   (t/is (syn/kernel-term? '(λ 2 (1 0))))
   (t/is (syn/kernel-term? '(A B))))
 
+;; Tests on type syntax
+
 (t/deftest type-var?-test
   (t/testing "positive"
     (t/is (syn/type-var? 'A)))
   (t/testing "negative"
     (t/is (not (syn/type-var? 'a)))
     (t/is (not (syn/type-var? '())))))
+
+(t/deftest nat-type?-test
+  (t/testing "positive"
+    (t/is (syn/nat-type? 'i)))
+  (t/testing "negative"
+    (t/is (not (syn/nat-type? 'I)))
+    (t/is (not (syn/nat-type? '())))))
 
 (t/deftest prop-type?-test
   (t/testing "positive"
@@ -64,5 +84,6 @@
 
 (t/deftest proper-type?-test
   (t/is (syn/proper-type? 'o))
+  (t/is (syn/proper-type? 'i))
   (t/is (syn/proper-type? 'A))
   (t/is (syn/proper-type? '(-> (-> A o) A o))))

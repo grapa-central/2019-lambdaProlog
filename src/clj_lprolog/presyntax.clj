@@ -17,14 +17,14 @@
 (defn bound?
   "Is `t` a bound variable ?"
   [t] (and (symbol? t)
+           (not (some #{t} syn/reserved))
            (not= (symbol (str/capitalize t)) t)))
 
 (defn free?
   "Is `t` a free variable ?"
   [t] (and (symbol? t)
+           (not (some #{t} syn/reserved))
            (= (symbol (str/capitalize t)) t)))
-
-;; TODO primitive constants
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
@@ -46,10 +46,11 @@
   [t env]
   (cond (bound? t) (get (first env) t)
         (free? t) t
+        (syn/primitive? t) t
         (lambda? t) (list
                      'λ
                      (count (second t))
-                     (parse-aux (second (rest t))
+                     (parse-aux (nth t 2)
                                 (reduce (fn [e x]
                                           (list
                                            (assoc (first e) x (second e))
