@@ -22,22 +22,14 @@
     (t/is (syn/lambda? '(λ [x y] x))))
   (t/testing "negative"
     (t/is (not (syn/lambda? '(l [x y] 1))))
-    (t/is (not (syn/lambda? '(λ [x] 1))))
-    (t/is (not (syn/lambda? '(λ [x] ()))))))
+    (t/is (not (syn/lambda? '(λ 1 x))))))
 
 (t/deftest application?-test
   (t/testing "positive"
     (t/is (syn/application? '(A x y))))
   (t/testing "negative"
     (t/is (not (syn/application? '())))
-    (t/is (not (syn/application? '(A))))
-    (t/is (not (syn/application? '(A ()))))))
-
-(t/deftest kernel-term?-test
-  (t/is (syn/user-term? 'x))
-  (t/is (syn/user-term? 'A))
-  (t/is (syn/user-term? '(λ [x y] (x y))))
-  (t/is (syn/user-term? '(A B))))
+    (t/is (not (syn/application? '(A))))))
 
 (t/deftest parse-test
   (t/testing "successful parsing"

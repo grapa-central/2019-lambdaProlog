@@ -14,8 +14,6 @@
 ;; - a n-ary application
 ;;}
 
-(declare user-term?)
-
 (defn bound?
   "Is `t` a bound variable ?"
   [t] (and (symbol? t)
@@ -33,20 +31,15 @@
   [t] (and (seq? t)
            (= (first t) 'λ)
            (vector? (second t)) (every? bound? (second t))
-           (user-term? (second (rest t)))))
+           ;; (user-term? (second (rest t))) Too costly during parsing
+           ))
 
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
            (not (empty? t)) (not (empty? (rest t)))
-           (every? user-term? t)))
-
-(defn user-term?
-  "Is `t` a kernel term ?"
-  [t] (or (bound? t)
-          (free? t)
-          (lambda? t)
-          (application? t)))
+           ;; (every? user-term? t) ;; Too costly during parsing
+           ))
 
 (defn parse-aux
   "Parse a user term `t` to a kernel term using a naming environment"
