@@ -94,37 +94,3 @@
   (t/is (syn/proper-type? 'i))
   (t/is (syn/proper-type? 'A))
   (t/is (syn/proper-type? '(-> (-> A o) A o))))
-
-(t/deftest pred?-test
-  (t/testing "positive"
-    (t/is (syn/pred? 'even)))
-  (t/testing "negative"
-    (t/is (not (syn/pred? 'Even)))))
-
-(t/deftest applied-pred?-test
-  (t/testing "positive"
-    (t/is (syn/applied-pred? '(even O)))
-    (t/is (syn/applied-pred? '(p A))))
-  (t/testing "negative"
-    (t/is (not (syn/applied-pred? '(Even O))))))
-
-(t/deftest clause-body?-test
-  (t/testing "positive"
-    (t/is (syn/clause-body? '((even N))))
-    (t/is (syn/clause-body? '())))
-  (t/testing "negative"
-    (t/is (not (syn/clause-body? '(even N)))))) ;; Careful with parenthesis !
-
-(t/deftest clause?-test
-  (t/testing "positive"
-    (t/is (syn/clause? '((even O))))
-    (t/is (syn/clause? '((even (S (S N))) (even N))))
-    (t/is (syn/clause? '((even (S (S N))) :- (even N)))))
-  (t/testing "negative"
-    (t/is (not (syn/clause? '(even O)))))) ;; Parenthesis !
-
-(t/deftest defpred-test
-  (t/is (= (macroexpand '(syn/defpred even (-> i o)
-                           ((even O))
-                           ((even (S (S N))) :- (even N))))
-           '(even (-> i o) (((even O)) ((even (S (S N))) (even N)))))))

@@ -43,3 +43,66 @@
   (t/testing "failed parsing"
     (t/is (nil? (syn/parse '())))
     (t/is (nil? (syn/parse '(λ [x y] z))))))
+
+;; Test on prolog vernacular syntax
+
+(t/deftest pred?-test
+  (t/testing "positive"
+    (t/is (syn/pred? 'even)))
+  (t/testing "negative"
+    (t/is (not (syn/pred? 'Even)))))
+
+(t/deftest applied-pred?-test
+  (t/testing "positive"
+    (t/is (syn/applied-pred? '(even O)))
+    (t/is (syn/applied-pred? '(p A))))
+  (t/testing "negative"
+    (t/is (not (syn/applied-pred? '(Even O))))))
+
+(t/deftest clause-body?-test
+  (t/testing "positive"
+    (t/is (syn/clause-body? '((even N))))
+    (t/is (syn/clause-body? '())))
+  (t/testing "negative"
+    (t/is (not (syn/clause-body? '(even N)))))) ;; Careful with parenthesis !
+
+(t/deftest clause?-test
+  (t/testing "positive"
+    (t/is (syn/clause? '((even O))))
+    (t/is (syn/clause? '((even (S (S N))) (even N))))
+    (t/is (syn/clause? '((even (S (S N))) :- (even N)))))
+  (t/testing "negative"
+    (t/is (not (syn/clause? '(even O)))))) ;; Parenthesis !
+
+;; Testing on defpred and addclause
+
+(t/deftest defpred-test
+  (t/testing "even"
+    (do
+      (swap! syn/progpreds (fn [_] {}))
+      (syn/defpred 'even '(-> i o))
+      (t/is (= @syn/progpreds {'even ['(-> i o) {}]}))))
+  (t/testing "even and odd"
+    (do
+      (swap! syn/progpreds (fn [_] {}))
+      (syn/defpred 'even '(-> i o))
+      (syn/defpred 'odd '(-> i o))
+      (t/is (= (get @syn/progpreds 'even) (get @syn/progpreds 'odd))))))
+
+(t/deftest addclause-test
+  (t/testing "even"
+    (do
+      (swap! syn/progpreds (fn [_] {}))
+      (syn/defpred 'even '(-> i o))
+      (syn/addclause '((even O)))
+      (syn/addclause '((even (S (S N))) :- (even N)))
+      (t/is (= @syn/progpreds {'even ['(-> i o)
+                                      {'(even O) '()
+                                       '(even (S (S N))) '((even N))}]}))))
+  (t/testing "is the identity"
+    (do
+      (swap! syn/progpreds (fn [_] {}))
+      (syn/defpred 'isid '(-> (-> A A) o))
+      (syn/addclause '((isid (λ [x] x))))
+      (t/is (= @syn/progpreds {'isid ['(-> (-> A A) o)
+                                      {'(isid (λ 1 0)) '()}]})))))
