@@ -90,3 +90,44 @@
           (nat-type? t)
           (prop-type? t)
           (arrow-type? t)))
+
+;;{
+;; # Prolog vernacular
+;;
+;; The user can define predicates using the macro `defpred`
+;; The parameters of the macro are:
+;; - the name of the predicate
+;; - its type
+;; - a set of horn clauses, with the conclusion
+;;   (which must be the predicate applied to the right number of arguments)
+;;   as its head, and some other predicates applied as its body
+;;}
+
+(defn pred?
+  "Is `t` a predicate ?"
+  [t] (and (symbol? t) (not= (symbol (str/capitalize t)) t)))
+
+(defn applied-pred?
+  "Is `t` an applied predicate ?"
+  [t] (and (seq? t) (pred? (first t))
+           (every? kernel-term? (rest t))))
+
+(defn clause-body?
+  "Is `t` a clause body ?"
+  [t] (or (every? applied-pred? t)))
+
+(defn clause?
+  "Is `t` a clause ?"
+  [t] (and (seq? t)
+           (applied-pred? (first t))
+           (or (clause-body? (rest t))
+               (and (= (second t) ':-) (clause? (nthrest t 2))))))
+
+(defmacro defpred
+  "Define a predicate. `n` is the name of the predicate,
+  `t` its type, `body` the list of predicates.
+  Also checks that the predicate is well formed. If it's not, return nil"
+  [n t & body]
+  (if (and (pred? n) (proper-type? t) (every? clause? body))
+    `(~n ~t
+      ~(map (fn [clause] (filter applied-pred? clause)) body))))
