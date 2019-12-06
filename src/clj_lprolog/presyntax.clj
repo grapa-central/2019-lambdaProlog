@@ -101,7 +101,7 @@
   [t] (and (seq? t)
            (applied-pred? (first t))
            (or (clause-body? (rest t))
-               (and (= (second t) ':-) (clause? (nthrest t 2))))))
+               (and (= (second t) ':-) (clause-body? (nthrest t 2))))))
 
 (defn parse-clause
   "Parse the clause `c` (removes the :-)"

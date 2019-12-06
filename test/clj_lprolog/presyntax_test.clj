@@ -64,7 +64,8 @@
     (t/is (syn/clause-body? '((even N))))
     (t/is (syn/clause-body? '())))
   (t/testing "negative"
-    (t/is (not (syn/clause-body? '(even N)))))) ;; Careful with parenthesis !
+    (t/is (not (syn/clause-body? '(even N))));; Careful with parenthesis !
+    (t/is (not (syn/clause-body? '((even N) :- (even N) :- (even N)))))))
 
 (t/deftest clause?-test
   (t/testing "positive"
