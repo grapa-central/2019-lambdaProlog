@@ -38,4 +38,8 @@
     (t/is (nil? (typ/infer-term '(S S))))
     (t/is (nil? (typ/infer-term '((λ 1 (+ 0 0)) S))))))
 
+;; Not easy to test metadata simply...
 
+(defn test-elab-meta
+  [] (binding [*print-meta* true]
+       (do (pr (typ/elaborate-term '((λ 2 (+ 1 1)) A O))) (println ""))))

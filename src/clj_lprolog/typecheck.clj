@@ -80,7 +80,7 @@
                     (> (count ty1) (count ty2))
                     [(syn/curry-arrow ty1 (- (count ty1) (count ty2))) ty2]
                     :else [ty1 ty2])]
-              (recur (concat (map (fn [x y] [x y]) ty1 ty2) (rest tys)) si))
+              (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2)) (rest tys)) si))
             :else nil ;; Types are not unifiable
       )))))
 
@@ -89,30 +89,58 @@
   { 'O 'i 'S '(-> i i) '+ '(-> i i i) '* '(-> i i i) })
 
 (defn infer-term
-  "Infer the type of `t`"
+  "Infer the type of `t`.
+   The call to the 2-parameters version returns a vector with:
+   - The substitution needed to be applied
+   - The type of the term
+   - The term enriched with metadata about its type"
   ([t] (second (infer-term t [])))
   ([t env] (cond
-             (syn/bound? t) [{} (nth env t)]
-             (syn/free? t) [{} (fresh-tvar)]
-             (syn/primitive? t) [{} (get primitive-env t)]
+             (syn/bound? t) [{} (nth env t) t]
+             (syn/free? t) (let [ty (fresh-tvar)]
+                             [{} ty (with-meta t {:ty ty})])
+             (syn/primitive? t) [{} (get primitive-env t) t]
              (syn/lambda? t)
              (let [ ty1 (repeatedly (second t) fresh-tvar) ]
                (if-let [ res2 (infer-term (nth t 2)
                                           (concat (reverse ty1) env)) ]
-                 (let [[si ty2] res2]
+                 (let [[si ty2 t'] res2]
                    (if-let [ty1 (map (fn [ty] (apply-subst-ty si ty)) ty1)]
-                     [si
-                      (concat (if (seq? ty1)
-                                (cons '-> ty1)
-                                (list '-> ty1)) (list ty2))]))))
+                     (let [ty (concat (if (seq? ty1)
+                                        (cons '-> ty1)
+                                        (list '-> ty1)) (list ty2))]
+                     [si ty (with-meta (list 'λ (second t) t') {:ty ty})])))))
              (syn/application? t)
-             (if-let [[sihd thd] (infer-term (first t) env)]
+             (if-let [[sihd thd hd'] (infer-term (first t) env)]
                (if-let [sittl (map (fn [t] (infer-term t env)) (rest t))]
-                 (let [ttl (map (fn [[_ t]] t) sittl)
-                       sitl (reduce (fn [si1 [si2 _]] (compose-subst si1 si2))
+                 (let [sitl (reduce (fn [si1 [si2 _ _]] (compose-subst si1 si2))
                                     {} sittl)
+                       ttl (map (fn [[_ ty _]] ty) sittl)
+                       tl' (map (fn [[_ _ t]] t) sittl)
                        ta (fresh-tvar)]
                    (if-let [si (mgu-ty thd (concat (cons '-> ttl) (list ta)))]
+                     (let [ty (apply-subst-ty si ta)]
                      [(compose-subst si (compose-subst sihd sitl))
-                      (apply-subst-ty si ta)])))
+                      ty (with-meta (cons hd' tl') {:ty ty})]))))
                ))))
+
+(defn apply-subst-metadata
+  "Apply a substitution `si` in the metadata of `t`"
+  [si t]
+  (cond
+    (syn/bound? t) t
+    (syn/free? t)
+    (vary-meta t (fn [me] {:ty (apply-subst-ty si (get me :ty))}))
+    (syn/primitive? t) t
+    (syn/lambda? t)
+    (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
+      {:ty (apply-subst-ty si (get (meta t) :ty))})
+    (syn/application? t)
+    (with-meta (map (fn [t] (apply-subst-metadata si t)) t)
+      {:ty (apply-subst-ty si (get (meta t) :ty))})
+    ))
+
+(defn elaborate-term
+  "Elaborate a term with its type information"
+  ([t] (let [[si _ t] (infer-term t [])]
+         (apply-subst-metadata si t))))
