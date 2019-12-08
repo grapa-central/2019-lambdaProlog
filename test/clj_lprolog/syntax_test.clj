@@ -35,21 +35,21 @@
     (t/is (not (syn/primitive? '∀)))
     (t/is (not (syn/primitive? 'λ)))))
 
-(t/deftest lambda?-test
+(t/deftest kernel-lambda?-test
   (t/testing "positive"
-    (t/is (syn/lambda? '(λ 2 1))))
+    (t/is (syn/proper-lambda? '(λ 2 1))))
   (t/testing "negative"
-    (t/is (not (syn/lambda? '(l 2 1))))
-    (t/is (not (syn/lambda? '(λ -1 1))))
-    (t/is (not (syn/lambda? '(λ 1 ()))))))
+    (t/is (not (syn/proper-lambda? '(l 2 1))))
+    (t/is (not (syn/proper-lambda? '(λ -1 1))))
+    (t/is (not (syn/proper-lambda? '(λ 1 ()))))))
 
-(t/deftest application?-test
+(t/deftest kernel-application?-test
   (t/testing "positive"
-    (t/is (syn/application? '(A 1 2))))
+    (t/is (syn/proper-application? '(A 1 2))))
   (t/testing "negative"
-    (t/is (not (syn/application? '())))
-    (t/is (not (syn/application? '(A))))
-    (t/is (not (syn/application? '(A ()))))))
+    (t/is (not (syn/proper-application? '())))
+    (t/is (not (syn/proper-application? '(A))))
+    (t/is (not (syn/proper-application? '(A ()))))))
 
 (t/deftest kernel-term?-test
   (t/is (syn/kernel-term? 1))
@@ -80,17 +80,27 @@
     (t/is (not (syn/prop-type? 'O)))
     (t/is (not (syn/prop-type? '())))))
 
-(t/deftest arrow-type?-test
+(t/deftest proper-arrow-type?-test
   (t/testing "positive"
-    (t/is (syn/arrow-type? '(-> A o)))
-    (t/is (syn/arrow-type? '(-> (-> A B) A B))))
+    (t/is (syn/proper-arrow-type? '(-> A o)))
+    (t/is (syn/proper-arrow-type? '(-> (-> A B) A B))))
   (t/testing "negative"
-    (t/is (not (syn/arrow-type? 'A)))
-    (t/is (not (syn/arrow-type? '(-> A))))
-    (t/is (not (syn/arrow-type? '(-> A ()))))))
+    (t/is (not (syn/proper-arrow-type? 'A)))
+    (t/is (not (syn/proper-arrow-type? '(-> A))))
+    (t/is (not (syn/proper-arrow-type? '(-> A ()))))))
 
 (t/deftest proper-type?-test
   (t/is (syn/proper-type? 'o))
   (t/is (syn/proper-type? 'i))
   (t/is (syn/proper-type? 'A))
   (t/is (syn/proper-type? '(-> (-> A o) A o))))
+
+(t/deftest destruct-arrow-test
+  (t/is (syn/destruct-arrow '(-> A B) 1) ['A 'B])
+  (t/is (syn/destruct-arrow '(-> A B C) 1) ['A '(-> B C)])
+  (t/is (syn/destruct-arrow '(-> A B C D E) 3) ['(A B C) '(-> D E)]))
+
+(t/deftest flatten-arrow-test
+  (t/is (syn/flatten-arrow 'A) 'A)
+  (t/is (syn/flatten-arrow '(-> A (-> B C))) '(-> A B C))
+  (t/is (syn/flatten-arrow '(-> A (-> B (-> C D)))) '(-> A B C D)))
