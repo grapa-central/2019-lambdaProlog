@@ -105,10 +105,11 @@
 
 (defn destruct-arrow
   "Get the `n` first parameter of an arrow type `ty`"
-  [ty n] (if (arrow-type? ty)
-           (let [head (take n (rest ty)) body (nthrest ty (inc n))]
-             [head (if (> (count body) 1)
-                     (cons '-> body) (first body))])))
+  [ty n] (if (= n 0) ['() ty]
+             (if (arrow-type? ty)
+               (let [head (take n (rest ty)) body (nthrest ty (inc n))]
+                 [head (if (> (count body) 1)
+                         (cons '-> body) (first body))]))))
 
 (defn flatten-arrow
   "Flatten an arrow type `ty` by right associativity"

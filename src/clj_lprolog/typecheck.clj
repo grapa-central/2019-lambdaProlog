@@ -37,7 +37,7 @@
   "Apply a substitution `si` to a type `ty`"
   [si ty] (reduce (fn [ty [var t]] (substitute-ty var t ty)) ty si))
 
-(defn subst-clash
+(defn subst-clash?
   "Check if there is a clash between `s1` and `s2`"
   [s1 s2] (some (fn [[x y1]]
                   (if (contains? s2 x)
@@ -48,7 +48,7 @@
 
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
-  [s1 s2] (if (subst-clash s1 s2) nil (conj s1 s2)))
+  [s1 s2] (if (or (nil? s1) (nil? s2) (subst-clash? s1 s2)) nil (conj s1 s2)))
 
 (defn mgu-ty
   "Finds the most general unifier for `ty1` and `ty2`"
@@ -144,3 +144,57 @@
   "Elaborate a term with its type information"
   ([t] (let [[si _ t] (infer-term t [])]
          (apply-subst-metadata si t))))
+
+(defn check-and-elaborate-term
+  "Check that `t` has type `ty`,
+   and returns the elaborated version according to this type"
+  [t ty] (let [[si ty2 t] (infer-term t [])]
+           (if-let [si2 (mgu-ty ty ty2)]
+             (if-let [si (compose-subst si si2)]
+               (apply-subst-metadata si t)))))
+
+;; (defn env-clash?
+;;   "Check if there is a clash between `e1` and `e2`"
+;;   [e1 e2] (some (fn [[x y1]]
+;;                   (and (contains? e2 x) (not (= y1 (get e2 x))))) e1))
+
+(defn apply-subst-env
+  "Apply the type substitution `si` in the environment `e`"
+  [si e] (reduce (fn [e [x ty]] (assoc e x (apply-subst-ty si ty))) {} e))
+
+(defn combine-env
+  "Combine two typing environments `e1` and `e2`"
+  [e1 e2] (if (or (nil? e1) (nil? e2)) nil
+              (if-let [subst (reduce
+                         (fn [s1 [x ty1]]
+                           (if (contains? e2 x)
+                             (let [ty2 (get e2 x)]
+                               (if-let [s2 (mgu-ty ty1 ty2)]
+                                 (compose-subst s1 s2)
+                                 ))
+                             s1))
+                         {} e1)]
+                    (let [e1 (apply-subst-env subst e1)]
+              (if (nil? e1) nil (conj e2 e1))))))
+
+(defn get-freevar-types
+  "Get the types of free variables in `t`"
+  [t] (cond
+        (syn/bound? t) {}
+        (syn/free? t) {t (get (meta t) :ty)}
+        (syn/primitive? t) {}
+        (syn/lambda? t) (get-freevar-types (nth t 2))
+        (syn/application? t)
+        (reduce (fn [e1 t] (combine-env e1 (get-freevar-types t))) {} t)))
+
+(defn check-and-freevar-types-pred
+  "Check the type and get freevar types for an applied predicate `t`.
+   The head of the predicate must appear in the environment `env`"
+  [t env] (if-let [ty (first (get env (first t)))]
+            (if-let [[params res] (syn/destruct-arrow ty (count (rest t)))]
+              (if (= res 'o)
+                (reduce (fn [e [t ty]]
+                          (combine-env
+                           e (get-freevar-types
+                              (check-and-elaborate-term t ty))))
+                        {} (zipmap (rest t) params))))))
