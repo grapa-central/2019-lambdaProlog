@@ -153,11 +153,6 @@
              (if-let [si (compose-subst si si2)]
                (apply-subst-metadata si t)))))
 
-;; (defn env-clash?
-;;   "Check if there is a clash between `e1` and `e2`"
-;;   [e1 e2] (some (fn [[x y1]]
-;;                   (and (contains? e2 x) (not (= y1 (get e2 x))))) e1))
-
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
   [si e] (reduce (fn [e [x ty]] (assoc e x (apply-subst-ty si ty))) {} e))
@@ -177,6 +172,22 @@
                     (let [e1 (apply-subst-env subst e1)]
               (if (nil? e1) nil (conj e2 e1))))))
 
+(defn elaborate-pred
+  "Elaborate terms of an applied predicate `t`.
+   The head of the predicate must appear in the program `prog`"
+  [t prog] (if-let [ty (first (get prog (first t)))]
+             (if-let [[params res] (syn/destruct-arrow ty (count (rest t)))]
+               (if (= res 'o)
+                 (cons (first t)
+                       (map (fn [[t ty]]
+                              (check-and-elaborate-term t ty))
+                         (zipmap (rest t) params)))))))
+
+(defn elaborate-clause
+  "Elaborate terms of a clause `c`"
+  [c prog] [(elaborate-pred (first c) prog)
+            (map (fn [t] (elaborate-pred t prog)) (second c))])
+
 (defn get-freevar-types
   "Get the types of free variables in `t`"
   [t] (cond
@@ -187,14 +198,59 @@
         (syn/application? t)
         (reduce (fn [e1 t] (combine-env e1 (get-freevar-types t))) {} t)))
 
-(defn check-and-freevar-types-pred
-  "Check the type and get freevar types for an applied predicate `t`.
-   The head of the predicate must appear in the environment `env`"
-  [t env] (if-let [ty (first (get env (first t)))]
+(defn check-freevar-pred
+  "Check and get freevar types for an elaborated applied predicate `t`.
+   The head of the predicate must appear in the program `prog`"
+  [t prog] (if-let [ty (first (get prog (first t)))]
             (if-let [[params res] (syn/destruct-arrow ty (count (rest t)))]
               (if (= res 'o)
                 (reduce (fn [e [t ty]]
                           (combine-env
-                           e (get-freevar-types
-                              (check-and-elaborate-term t ty))))
+                           e (get-freevar-types t)))
                         {} (zipmap (rest t) params))))))
+
+(defn elaborate-and-freevar-pred
+  "Elaborate an applied predicate `t`, and get its freevar types,
+   while checking everything"
+  [t prog] (if-let [t (elaborate-pred t prog)]
+             (if-let [vars (check-freevar-pred t prog)]
+               [t vars])))
+
+(defn check-freevar-clause
+  "Check and get freevar types for an elaborated clause `c`"
+  [c prog] (let [fvt (check-freevar-pred (first c) prog)]
+             (reduce (fn [fvt t]
+                       (combine-env fvt (check-freevar-pred t prog)))
+                     fvt (second c))))
+
+(defn elaborate-and-freevar-clause
+  "Check and get freevar types for an elaborated clause `c`"
+  [c prog] (if-let [c (elaborate-clause c prog)]
+             (if-let [vars (check-freevar-clause c prog)]
+               [c vars])))
+
+(defn map-of-pair-list
+  "Turn a list of pairs into a map"
+  [l] (reduce (fn [m [k v]] (assoc m k v)) {} l))
+
+(defn elaborate-program
+  "Elaborate the whole program `prog`"
+  [prog]
+  (map-of-pair-list
+   (map (fn [[pred [ty clauses]]]
+          [pred [ty (map-of-pair-list (map (fn [c] (elaborate-clause c prog)) clauses))]]) prog)))
+
+(defn elaborate-and-check-program
+  "Elaborate `prog`, and check that the use of freevars is coherent"
+  [prog]
+  (if-let [prog (elaborate-program prog)]
+    (if (every? (fn [[_ [_ clauses]]]
+                  (every? (fn [c]
+                            (not (nil? (check-freevar-clause c prog))))
+                          clauses))
+                prog)
+      prog)))
+
+(defn type-check-program?
+  "Returns true if the program is correctly typed, false otherwise"
+  [prog] (not (nil? (elaborate-and-check-program prog))))

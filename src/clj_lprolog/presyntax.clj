@@ -135,11 +135,3 @@
                          (list (first prev#)
                                (assoc (second prev#)
                                       head# body#)))))))))
-
-;; (defpred 'even '(-> i o))
-;; (addclause '((even O)))
-;; (addclause '((even (S (S N))) :- (even N)))
-
-;; (defpred 'odd '(-> i o))
-;; (addclause '((odd (S O))))
-;; (addclause '((odd (S N)) :- (even N)))
