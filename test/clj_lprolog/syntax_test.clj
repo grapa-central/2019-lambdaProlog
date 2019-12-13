@@ -96,11 +96,11 @@
   (t/is (syn/proper-type? '(-> (-> A o) A o))))
 
 (t/deftest destruct-arrow-test
-  (t/is (syn/destruct-arrow '(-> A B) 1) ['A 'B])
-  (t/is (syn/destruct-arrow '(-> A B C) 1) ['A '(-> B C)])
-  (t/is (syn/destruct-arrow '(-> A B C D E) 3) ['(A B C) '(-> D E)]))
+  (t/is (= ['(A) 'B] (syn/destruct-arrow '(-> A B) 1)))
+  (t/is (= ['(A) '(-> B C)] (syn/destruct-arrow '(-> A B C) 1)))
+  (t/is (= ['(A B C) '(-> D E)] (syn/destruct-arrow '(-> A B C D E) 3))))
 
 (t/deftest flatten-arrow-test
-  (t/is (syn/flatten-arrow 'A) 'A)
-  (t/is (syn/flatten-arrow '(-> A (-> B C))) '(-> A B C))
-  (t/is (syn/flatten-arrow '(-> A (-> B (-> C D)))) '(-> A B C D)))
+  (t/is (= 'A (syn/flatten-arrow 'A)))
+  (t/is (= '(-> A B C) (syn/flatten-arrow '(-> A (-> B C)))))
+  (t/is (= '(-> A B C D) (syn/flatten-arrow '(-> A (-> B (-> C D)))))))

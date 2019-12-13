@@ -1,7 +1,11 @@
 (ns clj-lprolog.typecheck
   "Typechecking of both lambda-terms and full program"
-  (:require [clj-lprolog.syntax :as syn]
-            [clj-lprolog.presyntax :as psyn]))
+  (:require [clj-lprolog.utils :as u :refer [example examples ok>]]
+            [clj-lprolog.syntax :as syn]
+            [clj-lprolog.presyntax :as psyn]
+            [clojure.test :as t]))
+
+(def +examples-enabled+ true)
 
 ;;{
 ;; STLC type inference
@@ -48,28 +52,49 @@
 
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
-  [s1 s2] (if (or (nil? s1) (nil? s2) (subst-clash? s1 s2)) nil (conj s1 s2)))
+  [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
+               [:ok (conj s1 s2)]))
+
+(compose-subst {} {})
+
+(examples
+ (compose-subst {'ty1 'i} {'ty2 'o}) =>
+ [:ok {'ty1 'i 'ty2 'o}]
+
+ (compose-subst {'ty1 'i} {'ty1 'o}) =>
+ [:ko> 'subst-clash {:s1 {'ty1 'i} :s2 {'ty1 'o}}])
 
 (defn mgu-ty
   "Finds the most general unifier for `ty1` and `ty2`"
   [ty1 ty2]
-  (loop [tys (list [ty1 ty2]) si {}]
-    (if (empty? tys) si
+  ((fn aux [tys si]
+    (if (empty? tys) [:ok si]
         (let [[ty1 ty2] (first tys)]
           (cond
+            ;; The two types are the same
             (= ty1 ty2) (recur (rest tys) si)
+
+            ;; ty1 is a unification variable
             (type-unif-var? ty1)
-            (if (some #{ty1} (get-unif-vars ty2)) nil
-                (let [si (compose-subst si {ty1 ty2})]
-                  (recur (map (fn [[x y]]
-                                [(apply-subst-ty si x) (apply-subst-ty si y)])
-                              (rest tys)) si)))
+            (ok>
+             (when (some #{ty1} (get-unif-vars ty2))
+               [:ko 'occur-check {:ty1 ty1 :ty2 ty2}])
+             (compose-subst si {ty1 ty2}) :as [_ si]
+             (aux (map (fn [[x y]]
+                         [(apply-subst-ty si x) (apply-subst-ty si y)])
+                       (rest tys)) si))
+
+            ;; ty2 is a unification variable
             (type-unif-var? ty2)
-            (if (some #{ty2} (get-unif-vars ty1)) nil
-                (let [si (compose-subst si {ty2 ty1})]
-                  (recur (map (fn [[x y]]
-                                [(apply-subst-ty si x) (apply-subst-ty si y)])
-                              (rest tys)) si)))
+            (ok>
+             (when (some #{ty2} (get-unif-vars ty1))
+               [:ko 'occur-check {:ty1 ty2 :ty2 ty1}])
+             (compose-subst si {ty2 ty1}) :as [_ si]
+             (aux (map (fn [[x y]]
+                         [(apply-subst-ty si x) (apply-subst-ty si y)])
+                       (rest tys)) si))
+
+            ;; ty1 and ty2 are arrow types
             (and (syn/arrow-type? ty1) (syn/arrow-type? ty2))
             (let [ty1 (syn/flatten-arrow ty1)
                   ty2 (syn/flatten-arrow ty2)
@@ -81,49 +106,81 @@
                     [(syn/curry-arrow ty1 (- (count ty1) (count ty2))) ty2]
                     :else [ty1 ty2])]
               (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2)) (rest tys)) si))
-            :else nil ;; Types are not unifiable
-      )))))
+
+            ;; Types are not unifiable
+            :else [:ko 'not-unifiable {:ty1 ty1 :ty2 ty2}]
+            )))
+    ) (list [ty1 ty2]) {}))
+
+(examples
+ (mgu-ty 'i 'i) => [:ok {}]
+ (mgu-ty 'i 'ty1) => [:ok {'ty1 'i}]
+ (mgu-ty '(-> ty1 ty2) '(-> i o)) => [:ok {'ty1 'i 'ty2 'o}])
 
 (def primitive-env
   "Types of primitives"
   { 'O 'i 'S '(-> i i) '+ '(-> i i i) '* '(-> i i i) })
 
-(defn infer-term
+(defn subst-infer-term
   "Infer the type of `t`.
    The call to the 2-parameters version returns a vector with:
    - The substitution needed to be applied
    - The type of the term
    - The term enriched with metadata about its type"
-  ([t] (second (infer-term t [])))
-  ([t env] (cond
-             (syn/bound? t) [{} (nth env t) t]
-             (syn/free? t) (let [ty (fresh-tvar)]
-                             [{} ty (with-meta t {:ty ty})])
-             (syn/primitive? t) [{} (get primitive-env t) t]
-             (syn/lambda? t)
-             (let [ ty1 (repeatedly (second t) fresh-tvar) ]
-               (if-let [ res2 (infer-term (nth t 2)
-                                          (concat (reverse ty1) env)) ]
-                 (let [[si ty2 t'] res2]
-                   (if-let [ty1 (map (fn [ty] (apply-subst-ty si ty)) ty1)]
-                     (let [ty (if (zero? (second t)) ty2
-                                (concat (if (seq? ty1)
-                                          (cons '-> ty1)
-                                          (list '-> ty1)) (list ty2)))]
-                     [si ty (with-meta (list 'λ (second t) t') {:ty ty})])))))
-             (syn/application? t)
-             (if-let [[sihd thd hd'] (infer-term (first t) env)]
-               (if-let [sittl (map (fn [t] (infer-term t env)) (rest t))]
-                 (let [sitl (reduce (fn [si1 [si2 _ _]] (compose-subst si1 si2))
-                                    {} sittl)
-                       ttl (map (fn [[_ ty _]] ty) sittl)
-                       tl' (map (fn [[_ _ t]] t) sittl)
-                       ta (fresh-tvar)]
-                   (if-let [si (mgu-ty thd (concat (cons '-> ttl) (list ta)))]
-                     (let [ty (apply-subst-ty si ta)]
-                     [(compose-subst si (compose-subst sihd sitl))
-                      ty (with-meta (cons hd' tl') {:ty ty})]))))
-               ))))
+  ([t] (subst-infer-term t []))
+  ([t env]
+   (cond
+     ;; t is a bound variable
+     (syn/bound? t)
+     (ok>
+      (when (>= t (count env)) [:ko> 'outside-env {:n t :env env}])
+      [:ok {} (nth env t) t])
+     ;; t is a free variable
+     (syn/free? t) (let [ty (fresh-tvar)]
+                     [:ok {} ty (with-meta t {:ty ty})])
+     ;; t is a primitive
+     (syn/primitive? t)
+     (ok> [:ok {} (get primitive-env t) t])
+
+     ;; t is a lambda-abstraction
+     (syn/lambda? t)
+     (ok>
+      (repeatedly (second t) fresh-tvar) :as ty1
+      (subst-infer-term (nth t 2) (concat (reverse ty1) env)) :as [_ si ty2 t']
+      (map (fn [ty] (apply-subst-ty si ty)) ty1) :as ty1
+      (if (zero? (second t)) ty2
+          (concat (if (seq? ty1)
+                    (cons '-> ty1)
+                    (list '-> ty1)) (list ty2))) :as ty
+      [:ok si ty (with-meta (list 'λ (second t) t') {:ty ty})]
+      )
+
+     ;; t is an application
+     (syn/application? t)
+     (ok>
+      (subst-infer-term (first t) env) :as [_ sihd thd hd']
+      (u/ok-map (fn [t] (subst-infer-term t env)) (rest t)) :as [_ sittl]
+      (u/ok-reduce (fn [si1 [si2 _ _]] (compose-subst si1 si2))
+                   {} sittl) :as [_ sitl]
+      (map (fn [[_ ty _]] ty) sittl) :as ttl
+      (map (fn [[_ _ t]] t) sittl) :as tl'
+      (fresh-tvar) :as ta
+      (mgu-ty thd (concat (cons '-> ttl) (list ta))) :as [_ si]
+      (apply-subst-ty si ta) :as ty
+      (compose-subst sihd sitl) :as [_ sihdtl]
+      (compose-subst si sihdtl) :as [_ si']
+      [:ok si' ty (with-meta (cons hd' tl') {:ty ty})]
+      ))))
+
+(defn infer-term
+  "Infer the type of `t`"
+  [t] (ok>
+       (subst-infer-term t) :as [_ _ ty _]
+       [:ok ty]))
+
+(examples
+ (infer-term '+) => [:ok '(-> i i i)]
+ (infer-term '((λ 1 0) (S O))) => [:ok 'i])
 
 (defn apply-subst-metadata
   "Apply a substitution `si` in the metadata of `t`"
@@ -143,16 +200,16 @@
 
 (defn elaborate-term
   "Elaborate a term with its type information"
-  ([t] (let [[si _ t] (infer-term t [])]
-         (apply-subst-metadata si t))))
+  ([t] (ok> (subst-infer-term t) :as [_ si _ t]
+            [:ok (apply-subst-metadata si t)])))
 
 (defn check-and-elaborate-term
   "Check that `t` has type `ty`,
    and returns the elaborated version according to this type"
-  [t ty] (let [[si ty2 t] (infer-term t [])]
-           (if-let [si2 (mgu-ty ty ty2)]
-             (if-let [si (compose-subst si si2)]
-               (apply-subst-metadata si t)))))
+  [t ty] (ok> (subst-infer-term t) :as [_ si ty2 t]
+              (mgu-ty ty ty2) :as [_ si2]
+              (compose-subst si si2) :as [_ si]
+              [:ok (apply-subst-metadata si t)]))
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
@@ -160,98 +217,109 @@
 
 (defn combine-env
   "Combine two typing environments `e1` and `e2`"
-  [e1 e2] (if (or (nil? e1) (nil? e2)) nil
-              (if-let [subst (reduce
-                         (fn [s1 [x ty1]]
-                           (if (contains? e2 x)
-                             (let [ty2 (get e2 x)]
-                               (if-let [s2 (mgu-ty ty1 ty2)]
-                                 (compose-subst s1 s2)
-                                 ))
-                             s1))
-                         {} e1)]
-                    (let [e1 (apply-subst-env subst e1)]
-              (if (nil? e1) nil (conj e2 e1))))))
+  [e1 e2] (ok> (u/ok-reduce (fn [s1 [x ty1]]
+                              (if (contains? e2 x)
+                                (ok> (get e2 x) :as ty2
+                                     (mgu-ty ty1 ty2) :as [_ s2]
+                                     (compose-subst s1 s2))
+                                [:ok s1]))
+                            {} e1) :as [_ si]
+               [:ok (conj (apply-subst-env si e1) (apply-subst-env si e2))]))
+
+(examples
+ (combine-env {'A 'i} {'B 'o}) => [:ok {'A 'i, 'B 'o}]
+ (combine-env {'A 'i} {'A 'ty1}) => [:ok {'A 'i}]
+ (u/ko-expr? (combine-env {'A 'i} {'A 'o})) => :ko)
 
 (defn elaborate-pred
   "Elaborate terms of an applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
-  [t prog] (if-let [ty (first (get prog (first t)))]
-             (if-let [[params res] (syn/destruct-arrow ty (count (rest t)))]
-               (if (= res 'o)
-                 (cons (first t)
-                       (map (fn [[t ty]]
-                              (check-and-elaborate-term t ty))
-                         (zipmap (rest t) params)))))))
+  [t prog]
+  (ok> (when (not (contains? prog (first t)))
+         [:ko 'predicate-not-found {:pred (first t)}])
+       (first (get prog (first t))) :as ty
+       (syn/destruct-arrow ty (count (rest t))) :as [params res]
+       (when (not= res 'o)
+         [:ko 'wrong-ret-type-for-predicate {:pred (first t) :ret-ty res}])
+       (u/ok-map (fn [[t ty]]
+                   (check-and-elaborate-term t ty))
+                 (zipmap (rest t) params)) :as [_ tl]
+       [:ok (cons (first t) (map (fn [[x]] x) tl))]))
 
 (defn elaborate-clause
   "Elaborate terms of a clause `c`"
-  [c prog] [(elaborate-pred (first c) prog)
-            (map (fn [t] (elaborate-pred t prog)) (second c))])
+  [c prog] (ok> (elaborate-pred (first c) prog) :as [_ hd]
+                (u/ok-map (fn [t] (elaborate-pred t prog)) (second c)) :as [_ tl]
+                [:ok [hd (map (fn [[t]] t) tl)]]))
 
 (defn get-freevar-types
   "Get the types of free variables in `t`"
   [t] (cond
-        (syn/bound? t) {}
-        (syn/free? t) {t (get (meta t) :ty)}
-        (syn/primitive? t) {}
+        (syn/bound? t) [:ok {}]
+        (syn/free? t) [:ok {t (get (meta t) :ty)}]
+        (syn/primitive? t) [:ok {}]
         (syn/lambda? t) (get-freevar-types (nth t 2))
         (syn/application? t)
-        (reduce (fn [e1 t] (combine-env e1 (get-freevar-types t))) {} t)))
+        (u/ok-reduce (fn [e1 t] (ok> (get-freevar-types t) :as [_ e2]
+                                    (combine-env e1 e2))) {} t)))
 
 (defn check-freevar-pred
   "Check and get freevar types for an elaborated applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
-  [t prog] (if-let [ty (first (get prog (first t)))]
-            (if-let [[params res] (syn/destruct-arrow ty (count (rest t)))]
-              (if (= res 'o)
-                (reduce (fn [e [t ty]]
-                          (combine-env
-                           e (get-freevar-types t)))
-                        {} (zipmap (rest t) params))))))
+  [t prog]
+  (ok> (when (not (contains? prog (first t)))
+         [:ko 'predicate-not-found {:pred (first t)}])
+       (first (get prog (first t))) :as ty
+       (syn/destruct-arrow ty (count (rest t))) :as [params res]
+       (when (not= res 'o)
+         [:ko 'wrong-ret-type-for-predicate {:pred (first t) :ret-ty res}])
+       (u/ok-reduce (fn [e1 [t ty]] (ok> (get-freevar-types t) :as [_ e2]
+                                        (combine-env e1 e2)))
+        {} (zipmap (rest t) params))
+       ))
 
 (defn elaborate-and-freevar-pred
   "Elaborate an applied predicate `t`, and get its freevar types,
    while checking everything"
-  [t prog] (if-let [t (elaborate-pred t prog)]
-             (if-let [vars (check-freevar-pred t prog)]
-               [t vars])))
+  [t prog] (ok> (elaborate-pred t prog) :as [_ t]
+                (check-freevar-pred t prog) :as [_ vars]
+                [:ok t vars]))
 
 (defn check-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
-  [c prog] (let [fvt (check-freevar-pred (first c) prog)]
-             (reduce (fn [fvt t]
-                       (combine-env fvt (check-freevar-pred t prog)))
-                     fvt (second c))))
+  [c prog]
+  (ok> (check-freevar-pred (first c) prog) :as [_ fvt]
+       (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred t prog) :as [_ e2]
+                                   (combine-env e1 e2)))
+                    fvt (second c))))
 
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
-  [c prog] (if-let [c (elaborate-clause c prog)]
-             (if-let [vars (check-freevar-clause c prog)]
-               [c vars])))
-
-(defn map-of-pair-list
-  "Turn a list of pairs into a map"
-  [l] (reduce (fn [m [k v]] (assoc m k v)) {} l))
+  [c prog] (ok> (elaborate-clause c prog) :as [_ c]
+                (check-freevar-clause c prog) :as [_ vars]
+                [:ok c vars]))
 
 (defn elaborate-program
   "Elaborate the whole program `prog`"
   [prog]
-  (map-of-pair-list
-   (map (fn [[pred [ty clauses]]]
-          [pred [ty (map-of-pair-list (map (fn [c] (elaborate-clause c prog)) clauses))]]) prog)))
+   (ok> (u/ok-map
+    (fn [[pred [ty clauses]]]
+      (ok> (u/ok-map (fn [c] (elaborate-clause c prog)) clauses) :as [_ clauses]
+           [:ok [pred [ty (u/map-of-pair-list (map (fn [[t]] t) clauses))]]]))
+    prog) :as [_ prog]
+        [:ok (u/map-of-pair-list (map (fn [[c]] c) prog))]))
 
 (defn elaborate-and-check-program
   "Elaborate `prog`, and check that the use of freevars is coherent"
   [prog]
-  (if-let [prog (elaborate-program prog)]
-    (if (every? (fn [[_ [_ clauses]]]
-                  (every? (fn [c]
-                            (not (nil? (check-freevar-clause c prog))))
-                          clauses))
-                prog)
-      prog)))
+  (ok> (elaborate-program prog) :as [_ prog]
+       (if (every?
+            (fn [[_ [_ clauses]]]
+              (every? (fn [c] (u/ok-expr? (check-freevar-clause c prog)))
+                      clauses))
+            prog)
+         [:ok prog] :ko)))
 
 (defn type-check-program?
   "Returns true if the program is correctly typed, false otherwise"
-  [prog] (not (nil? (elaborate-and-check-program prog))))
+  [prog] (u/ok-expr? (elaborate-and-check-program prog)))
