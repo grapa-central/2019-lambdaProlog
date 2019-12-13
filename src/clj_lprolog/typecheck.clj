@@ -106,9 +106,10 @@
                                           (concat (reverse ty1) env)) ]
                  (let [[si ty2 t'] res2]
                    (if-let [ty1 (map (fn [ty] (apply-subst-ty si ty)) ty1)]
-                     (let [ty (concat (if (seq? ty1)
-                                        (cons '-> ty1)
-                                        (list '-> ty1)) (list ty2))]
+                     (let [ty (if (zero? (second t)) ty2
+                                (concat (if (seq? ty1)
+                                          (cons '-> ty1)
+                                          (list '-> ty1)) (list ty2)))]
                      [si ty (with-meta (list 'λ (second t) t') {:ty ty})])))))
              (syn/application? t)
              (if-let [[sihd thd hd'] (infer-term (first t) env)]

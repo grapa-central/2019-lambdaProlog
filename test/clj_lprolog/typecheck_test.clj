@@ -34,7 +34,8 @@
     (t/is (some? (typ/infer-term '(λ 1 0))))
     (t/is (some? (typ/infer-term '(λ 2 1))))
     (t/is (some? (typ/infer-term '('(λ 2 1) O))))
-    (t/is (= '(-> i i) (typ/infer-term '((λ 2 (+ 0 1)) O)))))
+    (t/is (= '(-> i i) (typ/infer-term '((λ 2 (+ 0 1)) O))))
+    (t/is (= 'i (typ/infer-term '(λ 0 (S O))))))
   (t/testing "negative"
     (t/is (nil? (typ/infer-term '(S S))))
     (t/is (nil? (typ/infer-term '((λ 1 (+ 0 0)) S))))))
@@ -54,7 +55,7 @@
   [t] (binding [*print-meta* true]
        (do (pr (typ/elaborate-term t)) (println ""))))
 
-;; (test-elab-meta '((λ 2 (+ 1 1)) A O))
+;; (test-elab-meta '(λ 0 O))
 ;; (test-check-elab-meta '(A O B) 'i)
 
 (defn test-check-elab-meta
