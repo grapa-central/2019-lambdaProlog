@@ -13,7 +13,18 @@
 ;; There is no let-binding in the language, we don't care about generalization
 ;;}
 
-(defn fresh-tvar [] (gensym "ty"))
+(defn fresh-tvar [count] (symbol (str "ty" count)))
+
+(example
+ (fresh-tvar 42) => 'ty42)
+
+(defn n-fresh-tvar [count n]
+  [(map first (take n (iterate (fn [[_ count]] [(fresh-tvar count) (inc count)])
+                    [(fresh-tvar count) (inc count)])))
+   (+ count n)])
+
+(example
+ (n-fresh-tvar 42 5) => ['(ty42 ty43 ty44 ty45 ty46) 47])
 
 (defn type-unif-var?
   "Is `t` a unification variable ?"
@@ -54,8 +65,6 @@
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
   [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
                [:ok (conj s1 s2)]))
-
-(compose-subst {} {})
 
 (examples
  (compose-subst {'ty1 'i} {'ty2 'o}) =>
@@ -127,45 +136,49 @@
    - The substitution needed to be applied
    - The type of the term
    - The term enriched with metadata about its type"
-  ([t] (subst-infer-term t []))
-  ([t env]
+  ([t] (ok> (subst-infer-term t [] 0) :as [_ si ty t _]
+            [:ok si ty t]))
+  ([t env cnt]
    (cond
      ;; t is a bound variable
      (syn/bound? t)
      (ok>
       (when (>= t (count env)) [:ko> 'outside-env {:n t :env env}])
-      [:ok {} (nth env t) t])
+      [:ok {} (nth env t) t cnt])
      ;; t is a free variable
-     (syn/free? t) (let [ty (fresh-tvar)]
-                     [:ok {} ty (with-meta t {:ty ty})])
+     (syn/free? t) (let [ty (fresh-tvar cnt)]
+                     [:ok {} ty (with-meta t {:ty ty}) (inc cnt)])
      ;; t is a primitive
      (syn/primitive? t)
-     (ok> [:ok {} (get primitive-env t) t])
+     (ok> [:ok {} (get primitive-env t) t cnt])
 
      ;; t is a lambda-abstraction
      (syn/lambda? t)
      (ok>
-      (repeatedly (second t) fresh-tvar) :as ty1
-      (subst-infer-term (nth t 2) (concat (reverse ty1) env)) :as [_ si ty2 t']
+      (n-fresh-tvar cnt (second t)) :as [ty1 cnt]
+      (subst-infer-term (nth t 2) (concat (reverse ty1) env) cnt)
+      :as [_ si ty2 t' cnt]
       [:ko 'type-infer-abs {:t t}]
       (map (fn [ty] (apply-subst-ty si ty)) ty1) :as ty1
       (if (zero? (second t)) ty2
           (concat (if (seq? ty1)
                     (cons '-> ty1)
                     (list '-> ty1)) (list ty2))) :as ty
-      [:ok si ty (with-meta (list 'λ (second t) t') {:ty ty})]
-      )
+      [:ok si ty (with-meta (list 'λ (second t) t') {:ty ty}) cnt])
 
      ;; t is an application
      (syn/application? t)
      (ok>
-      (subst-infer-term (first t) env) :as [_ sihd thd hd']
-      (u/ok-map (fn [t] (subst-infer-term t env)) (rest t)) :as [_ sittl]
-      (u/ok-reduce (fn [si1 [si2 _ _]] (compose-subst si1 si2))
+      (subst-infer-term (first t) env cnt) :as [_ sihd thd hd' cnt]
+      (u/ok-reduce (fn [[l cnt] t]
+                     (ok> (subst-infer-term t env cnt) :as [_ si ty t cnt]
+                          [:ok [(cons [si ty t] l) cnt]]))
+                   ['() cnt] (rest t)) :as [_ [sittl cnt]]
+      (u/ok-reduce (fn [si1 [si2 _ _ _]] (compose-subst si1 si2))
                    {} sittl) :as [_ sitl]
-      (map (fn [[_ ty _]] ty) sittl) :as ttl
-      (map (fn [[_ _ t]] t) sittl) :as tl'
-      (fresh-tvar) :as ta
+      (map (fn [[_ ty _ _]] ty) sittl) :as ttl
+      (map (fn [[_ _ t _]] t) sittl) :as tl'
+      (fresh-tvar cnt) :as ta
       (mgu-ty thd (concat (cons '-> ttl) (list ta))) :as [_ si]
       [:ko 'type-infer-app {:t t}]
       (apply-subst-ty si ta) :as ty
@@ -173,7 +186,7 @@
       [:ko 'type-infer-app {:t t}]
       (compose-subst si sihdtl) :as [_ si']
       [:ko 'type-infer-app {:t t}]
-      [:ok si' ty (with-meta (cons hd' tl') {:ty ty})]
+      [:ok si' ty (with-meta (cons hd' tl') {:ty ty}) (inc cnt)]
       ))))
 
 (defn infer-term
