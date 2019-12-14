@@ -147,6 +147,7 @@
      (ok>
       (repeatedly (second t) fresh-tvar) :as ty1
       (subst-infer-term (nth t 2) (concat (reverse ty1) env)) :as [_ si ty2 t']
+      [:ko 'type-infer-abs {:t t}]
       (map (fn [ty] (apply-subst-ty si ty)) ty1) :as ty1
       (if (zero? (second t)) ty2
           (concat (if (seq? ty1)
@@ -166,9 +167,12 @@
       (map (fn [[_ _ t]] t) sittl) :as tl'
       (fresh-tvar) :as ta
       (mgu-ty thd (concat (cons '-> ttl) (list ta))) :as [_ si]
+      [:ko 'type-infer-app {:t t}]
       (apply-subst-ty si ta) :as ty
       (compose-subst sihd sitl) :as [_ sihdtl]
+      [:ko 'type-infer-app {:t t}]
       (compose-subst si sihdtl) :as [_ si']
+      [:ko 'type-infer-app {:t t}]
       [:ok si' ty (with-meta (cons hd' tl') {:ty ty})]
       ))))
 
@@ -208,6 +212,7 @@
    and returns the elaborated version according to this type"
   [t ty] (ok> (subst-infer-term t) :as [_ si ty2 t]
               (mgu-ty ty ty2) :as [_ si2]
+              [:ko 'check-term {:t t :ty ty}]
               (compose-subst si si2) :as [_ si]
               [:ok (apply-subst-metadata si t)]))
 
@@ -221,6 +226,7 @@
                               (if (contains? e2 x)
                                 (ok> (get e2 x) :as ty2
                                      (mgu-ty ty1 ty2) :as [_ s2]
+                                     [:ko 'combine-env {:e1 e1 :e2 e2}]
                                      (compose-subst s1 s2))
                                 [:ok s1]))
                             {} e1) :as [_ si]
@@ -234,22 +240,25 @@
 (defn elaborate-pred
   "Elaborate terms of an applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
-  [t prog]
-  (ok> (when (not (contains? prog (first t)))
-         [:ko 'predicate-not-found {:pred (first t)}])
-       (first (get prog (first t))) :as ty
-       (syn/destruct-arrow ty (count (rest t))) :as [params res]
+  [p prog]
+  (ok> (when (not (contains? prog (first p)))
+         [:ko 'predicate-not-found {:pred (first p)}])
+       (first (get prog (first p))) :as ty
+       (syn/destruct-arrow ty (count (rest p))) :as [params res]
        (when (not= res 'o)
-         [:ko 'wrong-ret-type-for-predicate {:pred (first t) :ret-ty res}])
+         [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
        (u/ok-map (fn [[t ty]]
                    (check-and-elaborate-term t ty))
-                 (zipmap (rest t) params)) :as [_ tl]
-       [:ok (cons (first t) (map (fn [[x]] x) tl))]))
+                 (zipmap (rest p) params)) :as [_ tl]
+       [:ko> 'elaborate-pred {:pred p}]
+       [:ok (cons (first p) (map (fn [[x]] x) tl))]))
 
 (defn elaborate-clause
   "Elaborate terms of a clause `c`"
   [c prog] (ok> (elaborate-pred (first c) prog) :as [_ hd]
+                [:ko> 'elaborate-clause {:c c}]
                 (u/ok-map (fn [t] (elaborate-pred t prog)) (second c)) :as [_ tl]
+                [:ko> 'elaborate-clause {:c c}]
                 [:ok [hd (map (fn [[t]] t) tl)]]))
 
 (defn get-freevar-types
@@ -276,6 +285,7 @@
        (u/ok-reduce (fn [e1 [t ty]] (ok> (get-freevar-types t) :as [_ e2]
                                         (combine-env e1 e2)))
         {} (zipmap (rest t) params))
+       [:ko> 'check-freevar-pred {:p t}]
        ))
 
 (defn elaborate-and-freevar-pred
@@ -289,9 +299,12 @@
   "Check and get freevar types for an elaborated clause `c`"
   [c prog]
   (ok> (check-freevar-pred (first c) prog) :as [_ fvt]
+       [:ko> 'check-freevar-clause {:c c}]
        (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred t prog) :as [_ e2]
                                    (combine-env e1 e2)))
-                    fvt (second c))))
+                    fvt (second c))
+       [:ko> 'check-freevar-clause {:c c}]
+       ))
 
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
@@ -313,13 +326,13 @@
   "Elaborate `prog`, and check that the use of freevars is coherent"
   [prog]
   (ok> (elaborate-program prog) :as [_ prog]
-       (if (every?
-            (fn [[_ [_ clauses]]]
-              (every? (fn [c] (u/ok-expr? (check-freevar-clause c prog)))
-                      clauses))
-            prog)
-         [:ok prog] :ko)))
+       (u/every-ok?
+        (fn [[_ [_ clauses]]]
+          (u/every-ok? (fn [c] (check-freevar-clause c prog))
+                  clauses)) prog)
+         [:ok prog]))
 
 (defn type-check-program?
   "Returns true if the program is correctly typed, false otherwise"
-  [prog] (u/ok-expr? (elaborate-and-check-program prog)))
+  [prog] (ok> (elaborate-and-check-program prog)
+              :ok))

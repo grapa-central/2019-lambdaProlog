@@ -153,8 +153,14 @@
              ~(if (and (seq (rest stmts))
                        (ko-expr? (first (rest stmts))))
                 `(chain-ko ~res-sym ~(first (rest stmts)))
+                ;; :as then ko
+                (if (and (seq (rest stmts))
+                         (#{:as 'as} (first (rest stmts)))
+                         (seq (drop 3 stmts))
+                         (ko-expr? (first (drop 3 stmts))))
+                  `(chain-ko ~res-sym ~(first (drop 3 stmts)))
                 ;; next is not a ko form
-                `~res-sym)
+                `~res-sym))
              ;; not a ko result
              ~(cond
                 ;; skip ko form if any
@@ -233,7 +239,7 @@
 
  (ok> (identity [:ko "bim" {:tip true}]) :as x
       [:ko> "boum" {:top 42}]
-      (+ 54 x)) => [:ko "bim" {:tip true}])
+      (+ 54 x)) => '[:ko "boum" {:top 42, :cause [:ko "bim" {:tip true}]}])
 
 (examples
  (ok> (vector (+ 40 2) (- 17 3)) :as [a b]
@@ -267,6 +273,19 @@
  (ok-reduce (fn [x y] [:ok (+ x y)]) 0 '(1 2 3)) => [:ok 6]
  (ok-reduce (fn [x y] (if (< x y) [:ok y] :ko)) 0 '(1 2 3 4)) => [:ok 4]
  (ok-reduce (fn [x y] (if (< x y) [:ok y] :ko)) 0 '(1 2 1 4)) => :ko
+ )
+
+(defn every-ok?
+  "Check if the predicates `p` returns an ok-expr for every element of `l`.
+  If it doesn't, returns the first ko"
+  [p l] (if (empty? l) :ok
+            (ok> (p (first l))
+                 (every-ok? p (rest l)))))
+
+(examples
+ (every-ok? (fn [x] :ok) '(1 2 3)) => :ok
+ (every-ok? (fn [x] [:ko x]) '(1 2 3)) => [:ko 1]
+ (every-ok? (fn [x] (if (= x 2) :ok [:ko x])) '(2 2 3 2)) => [:ko 3]
  )
 
 ;; Other utils
