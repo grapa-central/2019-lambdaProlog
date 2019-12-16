@@ -67,9 +67,6 @@
   [t ty] (u/ok> (typ/check-and-elaborate-term t ty) :as [_ t]
                 (typ/get-freevar-types t)))
 
-(elab-and-freevars '(λ 1 A) '(-> i o))
-(typ/check-and-elaborate-term '((λ 1 A) A) 'i)
-
 (t/deftest get-freevar-types-test
   (t/testing "positive"
     (t/is (= [:ok {'A 'o}] (elab-and-freevars '(λ 1 A) '(-> i o))))

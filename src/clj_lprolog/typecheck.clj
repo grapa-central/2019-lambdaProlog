@@ -197,6 +197,8 @@
 
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
+ (infer-term '(λ 2 0)) => [:ok '(-> ty0 ty1 ty1)]
+ (infer-term '((λ 2 1) (λ 1 0))) => [:ok '(-> ty1 (-> ty2 ty2))]
  (infer-term '((λ 1 0) (S O))) => [:ok 'i])
 
 (defn apply-subst-metadata
@@ -308,6 +310,10 @@
                 (check-freevar-pred t prog) :as [_ vars]
                 [:ok t vars]))
 
+(example
+ (elaborate-and-freevar-pred '(even (S N)) {'even ['(-> i o)]}) =>
+ [:ok '(even (S N)) {'N 'i}])
+
 (defn check-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
   [c prog]
@@ -324,6 +330,11 @@
   [c prog] (ok> (elaborate-clause c prog) :as [_ c]
                 (check-freevar-clause c prog) :as [_ vars]
                 [:ok c vars]))
+
+(example
+ (elaborate-and-freevar-clause ['(even (S (S N))) '((even N))]
+                               {'even ['(-> i o)]}) =>
+ [:ok ['(even (S (S N))) '((even N))] {'N 'i}])
 
 (defn elaborate-program
   "Elaborate the whole program `prog`"
