@@ -1,6 +1,9 @@
 (ns clj-lprolog.syntax
   "Kernel syntax"
-  (:require [clojure.string :as str]))
+  (:require [clj-lprolog.utils :as u :refer [example examples]]
+            [clojure.string :as str]))
+
+(def +examples-enabled+ true)
 
 ;;{
 ;; # Kernel terms
@@ -21,13 +24,21 @@
   "Is `t` a bound variable ?"
   [t] (nat-int? t))
 
+(example (bound? 1) => true)
+
 (defn free?
   "Is `t` a free variable ?"
   [t] (and (symbol? t) (not (some #{t} reserved))))
 
+(example (free? 'A) => true)
+
 (defn primitive?
   "Is `t` a primitive constant ?"
-  [t] (some #{t} (nthrest reserved 2)))
+  [t] (some? (some #{t} (nthrest reserved 2))))
+
+(examples
+ (primitive? 'S) => true
+ (primitive? '+) => true)
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
@@ -35,10 +46,14 @@
            (= (first t) 'λ)
            (nat-int? (second t))))
 
+(example (lambda? '(λ 2 (+ 1 0))) => true)
+
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
            (not (empty? t)) (not (empty? (rest t)))))
+
+(example (application? '(S O)) => true)
 
 ;;{
 ;; # Type syntax
@@ -55,19 +70,29 @@
   [t] (and (symbol? t)
            (= (symbol (str/capitalize t)) t)))
 
+(example (type-var? 'A) => true)
+
 (defn nat-type?
   "Is `t` the nat type ?"
   [t] (= t 'i))
 
+(example (nat-type? 'i) => true)
+
 (defn prop-type?
   "Is `t` the proposition type ?"
   [t] (= t 'o))
+
+(example (prop-type? 'o) => true)
 
 (defn arrow-type?
   "Is `t` an arrow type ?"
   [t] (and (seq? t)
            (> (count t) 2)
            (= (first t) '->)))
+
+(examples
+ (arrow-type? '(-> i o)) => true
+ (arrow-type? '(-> ty1 ty2 ty1)) => true)
 
 (defn destruct-arrow
   "Get the `n` first parameter of an arrow type `ty`"

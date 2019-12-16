@@ -4,6 +4,8 @@
             [clojure.string :as str]
             [clj-lprolog.syntax :as syn]))
 
+(def +examples-enabled+ true)
+
 ;;{
 ;; # Kernel terms
 ;;
@@ -22,10 +24,14 @@
   [t] (and (syn/lambda? t)
            (proper-kernel-term? (nth t 2))))
 
+(example (proper-lambda? '(λ 2 0)) => true)
+
 (defn proper-application?
   "Is `t` a well-formed application ?"
   [t] (and (syn/application? t)
            (every? proper-kernel-term? t)))
+
+(example (proper-application? '((λ 2 0) A B)) => true)
 
 (defn proper-kernel-term?
   "Is `t` a kernel term ?"
@@ -52,6 +58,8 @@
   [t] (and (syn/arrow-type? t)
            (every? proper-type? (rest t))))
 
+(example (proper-arrow-type? '(-> A (-> B C))) => true)
+
 (defn proper-type?
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
@@ -76,11 +84,15 @@
            (not (some #{t} syn/reserved))
            (not= (symbol (str/capitalize t)) t)))
 
+(example (bound? 'x) => true)
+
 (defn free?
   "Is `t` a free variable ?"
   [t] (and (symbol? t)
            (not (some #{t} syn/reserved))
            (= (symbol (str/capitalize t)) t)))
+
+(example (free? 'X) => true)
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
@@ -88,10 +100,22 @@
            (= (first t) 'λ)
            (vector? (second t)) (every? bound? (second t))))
 
+(example (lambda? '(λ [x y] (+ x y))) => true)
+
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
            (not (empty? t)) (not (empty? (rest t)))))
+
+(example (application? '(A B)) => true)
+
+(defn user-term?
+  "Is `t` a user term ?"
+  [t] (or (bound? t)
+          (free? t)
+          (syn/primitive? t)
+          (lambda? t)
+          (application? t)))
 
 (defn parse-aux
   "Parse a user term `t` to a kernel term using a naming environment"
@@ -147,9 +171,13 @@
   "Is `t` a predicate ?"
   [t] (and (symbol? t) (not= (symbol (str/capitalize t)) t)))
 
+(example (pred? 'even) => true)
+
 (defn applied-pred?
   "Is `t` an applied predicate ?"
   [t] (and (seq? t) (pred? (first t))))
+
+(example (applied-pred? '(even (S N))) => true)
 
 (defn parse-applied-pred
   "Parse the arguments of an applied predicate `p`"
@@ -159,7 +187,9 @@
 
 (defn clause-body?
   "Is `t` a clause body ?"
-  [t] (or (every? applied-pred? t)))
+  [t] (every? applied-pred? t))
+
+(example (clause-body? '((even N) (even O))) => true)
 
 (defn clause?
   "Is `t` a clause ?"
@@ -167,6 +197,10 @@
            (applied-pred? (first t))
            (or (clause-body? (rest t))
                (and (= (second t) ':-) (clause-body? (nthrest t 2))))))
+
+(examples
+ (clause? '((even (S N)) :- (even N))) => true
+ (clause? '((even (S N)) (even N))) => true)
 
 (defn parse-clause
   "Parse the clause `c` (removes the :-)"
