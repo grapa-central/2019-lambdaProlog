@@ -13,8 +13,6 @@
 ;; - a n-ary application
 ;;}
 
-(declare kernel-term?)
-
 (def reserved
   "Reserved symbols"
   '(λ ∀ => O S + *))
@@ -37,28 +35,10 @@
            (= (first t) 'λ)
            (nat-int? (second t))))
 
-(defn proper-lambda?
-  "Is `t` a well-formed λ-abstraction ?"
-  [t] (and (lambda? t)
-           (kernel-term? (nth t 2))))
-
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
            (not (empty? t)) (not (empty? (rest t)))))
-
-(defn proper-application?
-  "Is `t` a well-formed application ?"
-  [t] (and (application? t)
-           (every? kernel-term? t)))
-
-(defn kernel-term?
-  "Is `t` a kernel term ?"
-  [t] (or (bound? t)
-          (free? t)
-          (primitive? t)
-          (proper-lambda? t)
-          (proper-application? t)))
 
 ;;{
 ;; # Type syntax
@@ -69,8 +49,6 @@
 ;; - the primitive "prop" type `o`
 ;; - a n-ary arrow type
 ;;}
-
-(declare proper-type?)
 
 (defn type-var?
   "Is `t` a type variable ?"
@@ -90,18 +68,6 @@
   [t] (and (seq? t)
            (> (count t) 2)
            (= (first t) '->)))
-
-(defn proper-arrow-type?
-  "Is `t` an arrow type ?"
-  [t] (and (arrow-type? t)
-           (every? proper-type? (rest t))))
-
-(defn proper-type?
-  "Is `t` a proper type ?"
-  [t] (or (type-var? t)
-          (nat-type? t)
-          (prop-type? t)
-          (proper-arrow-type? t)))
 
 (defn destruct-arrow
   "Get the `n` first parameter of an arrow type `ty`"

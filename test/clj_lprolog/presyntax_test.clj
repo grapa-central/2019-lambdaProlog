@@ -2,6 +2,47 @@
   (:require [clj-lprolog.presyntax :as syn]
             [clojure.test :as t]))
 
+;; Tests on proper kernel terms
+
+(t/deftest proper-kernel-lambda?-test
+  (t/testing "positive"
+    (t/is (syn/proper-lambda? '(λ 2 1))))
+  (t/testing "negative"
+    (t/is (not (syn/proper-lambda? '(l 2 1))))
+    (t/is (not (syn/proper-lambda? '(λ -1 1))))
+    (t/is (not (syn/proper-lambda? '(λ 1 ()))))))
+
+(t/deftest proper-kernel-application?-test
+  (t/testing "positive"
+    (t/is (syn/proper-application? '(A 1 2))))
+  (t/testing "negative"
+    (t/is (not (syn/proper-application? '())))
+    (t/is (not (syn/proper-application? '(A))))
+    (t/is (not (syn/proper-application? '(A ()))))))
+
+(t/deftest proper-kernel-term?-test
+  (t/is (syn/proper-kernel-term? 1))
+  (t/is (syn/proper-kernel-term? 'A))
+  (t/is (syn/proper-kernel-term? '(λ 2 (1 0))))
+  (t/is (syn/proper-kernel-term? '(A B))))
+
+;; Tests on proper type syntax
+
+(t/deftest proper-arrow-type?-test
+  (t/testing "positive"
+    (t/is (syn/proper-arrow-type? '(-> A o)))
+    (t/is (syn/proper-arrow-type? '(-> (-> A B) A B))))
+  (t/testing "negative"
+    (t/is (not (syn/proper-arrow-type? 'A)))
+    (t/is (not (syn/proper-arrow-type? '(-> A))))
+    (t/is (not (syn/proper-arrow-type? '(-> A ()))))))
+
+(t/deftest proper-type?-test
+  (t/is (syn/proper-type? 'o))
+  (t/is (syn/proper-type? 'i))
+  (t/is (syn/proper-type? 'A))
+  (t/is (syn/proper-type? '(-> (-> A o) A o))))
+
 ;; Tests on user terms syntax
 
 (t/deftest bound?-test

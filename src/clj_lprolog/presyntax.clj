@@ -4,6 +4,61 @@
             [clj-lprolog.syntax :as syn]))
 
 ;;{
+;; # Kernel terms
+;;
+;; A kernel lambda-term is either:
+;; - a bound variable (identified by its De Bruijn index)
+;; - a free (substituable) variable (identified by a symbol)
+;; - a primitive constant (∀, =>, O, S, +, *)
+;; - a n-ary λ-abstraction
+;; - a n-ary application
+;;}
+
+(declare proper-kernel-term?)
+
+(defn proper-lambda?
+  "Is `t` a well-formed λ-abstraction ?"
+  [t] (and (syn/lambda? t)
+           (proper-kernel-term? (nth t 2))))
+
+(defn proper-application?
+  "Is `t` a well-formed application ?"
+  [t] (and (syn/application? t)
+           (every? proper-kernel-term? t)))
+
+(defn proper-kernel-term?
+  "Is `t` a kernel term ?"
+  [t] (or (syn/bound? t)
+          (syn/free? t)
+          (syn/primitive? t)
+          (proper-lambda? t)
+          (proper-application? t)))
+
+;;{
+;; # Type syntax
+;;
+;; A type is either
+;; - a type variable (identified by an capitalized symbol)
+;; - the primitive "nat" type `i`
+;; - the primitive "prop" type `o`
+;; - a n-ary arrow type
+;;}
+
+(declare proper-type?)
+
+(defn proper-arrow-type?
+  "Is `t` an arrow type ?"
+  [t] (and (syn/arrow-type? t)
+           (every? proper-type? (rest t))))
+
+(defn proper-type?
+  "Is `t` a proper type ?"
+  [t] (or (syn/type-var? t)
+          (syn/nat-type? t)
+          (syn/prop-type? t)
+          (proper-arrow-type? t)))
+
+;;{
 ;; # User terms
 ;;
 ;; An user lambda-term is either:
@@ -62,7 +117,7 @@
   "Parse a user term `t` to a kernel term.
   Mainly transforms bound variables to De Bruijn indices"
   [t] (let [t' (parse-aux t '({} 0))]
-        (if (syn/kernel-term? t') t' nil)))
+        (if (proper-kernel-term? t') t' nil)))
 
 
 ;;{
@@ -117,7 +172,7 @@
   "Define a predicate. `n` is the name of the predicate, and `t` its type
   Also checks that the predicate is well formed. If it's not, return nil"
   [n t]
-  `(if (and (pred? ~n) (syn/proper-type? ~t))
+  `(if (and (pred? ~n) (proper-type? ~t))
      (swap! progpreds (fn [pp#] (assoc pp# ~n [~t {}])))))
 
 (defmacro addclause
