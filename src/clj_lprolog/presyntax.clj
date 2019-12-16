@@ -1,6 +1,7 @@
 (ns clj-lprolog.presyntax
   "User lambda-calculus syntax"
-  (:require [clojure.string :as str]
+  (:require [clj-lprolog.utils :as u :refer [example examples ok>]]
+            [clojure.string :as str]
             [clj-lprolog.syntax :as syn]))
 
 ;;{
@@ -85,39 +86,48 @@
   "Is `t` a λ-abstraction ?"
   [t] (and (seq? t)
            (= (first t) 'λ)
-           (vector? (second t)) (every? bound? (second t))
-           ;; (user-term? (second (rest t))) Too costly during parsing
-           ))
+           (vector? (second t)) (every? bound? (second t))))
 
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
-           (not (empty? t)) (not (empty? (rest t)))
-           ;; (every? user-term? t) ;; Too costly during parsing
-           ))
+           (not (empty? t)) (not (empty? (rest t)))))
 
 (defn parse-aux
   "Parse a user term `t` to a kernel term using a naming environment"
   [t env]
-  (cond (bound? t) (get (first env) t)
-        (free? t) t
-        (syn/primitive? t) t
-        (lambda? t) (list
-                     'λ
-                     (count (second t))
-                     (parse-aux (nth t 2)
-                                (reduce (fn [e x]
-                                          (list
-                                           (assoc (first e) x (second e))
-                                           (+ (second e) 1)))
-                                        env (second t))))
-        (application? t) (map (fn [t] (parse-aux t env)) t)))
+  (cond (bound? t)
+        (ok> (when (not (contains? (first env) t))
+               [:ko 'bound-not-in-env {:var t :env (first env)}])
+             [:ok (get (first env) t)])
+
+        (free? t) [:ok t]
+
+        (syn/primitive? t) [:ok t]
+
+        (lambda? t)
+        (ok> (parse-aux
+              (nth t 2)
+              (reduce (fn [e x]
+                        (list
+                         (assoc (first e) x (second e))
+                         (+ (second e) 1)))
+                      env (second t))) :as [_ t']
+        [:ok (list 'λ (count (second t)) t')])
+
+        (application? t)
+        (ok> (u/ok-map (fn [t] (parse-aux t env)) t) :as [_ t']
+             [:ok (map (fn [[t]] t) t')])
+
+        :else [:ko 'not-a-user-term {:t t}]))
 
 (defn parse
   "Parse a user term `t` to a kernel term.
   Mainly transforms bound variables to De Bruijn indices"
-  [t] (let [t' (parse-aux t '({} 0))]
-        (if (proper-kernel-term? t') t' nil)))
+  [t] (ok> (parse-aux t '({} 0)) :as [_ t']
+           [:ko> 'parsing-term {:t t}]
+           (if (proper-kernel-term? t') [:ok t']
+               [:ko 'not-a-proper-kernel-term {:t t'}])))
 
 
 ;;{
@@ -139,13 +149,13 @@
 
 (defn applied-pred?
   "Is `t` an applied predicate ?"
-  [t] (and (seq? t) (pred? (first t))
-           ;; (every? syn/user-term? (rest t)) ;; Lets parse instead
-           ))
+  [t] (and (seq? t) (pred? (first t))))
 
 (defn parse-applied-pred
   "Parse the arguments of an applied predicate `p`"
-  [p] (cons (first p) (map parse (rest p))))
+  [p] (ok> (u/ok-map parse (rest p)) :as [_ tl]
+           [:ko> 'parsing-applied-pred {:pred p}]
+           [:ok (cons (first p) (map (fn [[t]] t) tl))]))
 
 (defn clause-body?
   "Is `t` a clause body ?"
@@ -160,9 +170,14 @@
 
 (defn parse-clause
   "Parse the clause `c` (removes the :-)"
-  [c] (if (clause-body? (rest c))
-        (map parse-applied-pred (cons (first c) (rest c)))
-        (map parse-applied-pred (cons (first c) (nthrest c 2)))))
+  [c] (ok> (when (not (clause? c)) [:ko 'parse-clause {:clause c}])
+           (parse-applied-pred (first c)) :as [_ hd]
+           [:ko> 'parsing-clause {:clause c}]
+           (if (clause-body? (rest c))
+             (u/ok-map parse-applied-pred (rest c))
+             (u/ok-map parse-applied-pred (nthrest c 2))) :as [_ tl]
+           [:ko> 'parsing-clause {:clause c}]
+           [:ok (cons hd (map (fn [[t]] t) tl))]))
 
 ;; Contains the set of predicates during execution of the program !
 ;; (maybe not ideal, see with a clojure expert how to do it better)
@@ -173,20 +188,20 @@
   Also checks that the predicate is well formed. If it's not, return nil"
   [n t]
   `(if (and (pred? ~n) (proper-type? ~t))
-     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t {}])))))
+     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t {}])))
+  [:ko 'defpred {:n ~n :t ~t}]))
 
 (defmacro addclause
   "Add `clause` to a predicate.
    Also checks that the clause is well formed"
   [clause]
-  `(if (clause? ~clause)
-     (let [clause# (parse-clause ~clause)
-           head# (first clause#)
-           body# (rest clause#)]
-       (swap! progpreds
-              (fn [pp#]
-                (if-let [prev# (get @progpreds (first head#))]
-                  (assoc pp# (first head#)
-                         (list (first prev#)
-                               (assoc (second prev#)
-                                      head# body#)))))))))
+  `(let [clause# (parse-clause ~clause)]
+     (if (u/ko-expr? clause#) [:ko 'addclause {:cause clause#}]
+         (let [head# (first (second clause#))
+               body# (rest (second clause#))]
+           (swap! progpreds
+                  (fn [pp#]
+                    (if-let [prev# (get @progpreds (first head#))]
+                      (assoc pp# (first head#)
+                             (list (first prev#)
+                                   (assoc (second prev#) head# body#))))))))))

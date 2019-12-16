@@ -1,6 +1,7 @@
 (ns clj-lprolog.presyntax-test
   (:require [clj-lprolog.presyntax :as syn]
-            [clojure.test :as t]))
+            [clojure.test :as t]
+            [clj-lprolog.utils :as u]))
 
 ;; Tests on proper kernel terms
 
@@ -77,13 +78,15 @@
 
 (t/deftest parse-test
   (t/testing "successful parsing"
-    (t/is (= (syn/parse '(λ [x y] (x y))) '(λ 2 (0 1))))
-    (t/is (= (syn/parse '(λ [x y] (+ x y))) '(λ 2 (+ 0 1))))
-    (t/is (= (syn/parse '(λ [x] (A x))) '(λ 1 (A 0))))
-    (t/is (= (syn/parse '((λ [x y] (x y)) (λ [x] x))) '((λ 2 (0 1)) (λ 1 0)))))
+    (t/is (= (syn/parse '(S N)) [:ok '(S N)]))
+    (t/is (= (syn/parse '(λ [x y] (x y))) [:ok '(λ 2 (0 1))]))
+    (t/is (= (syn/parse '(λ [x y] (+ x y))) [:ok '(λ 2 (+ 0 1))]))
+    (t/is (= (syn/parse '(λ [x] (A x))) [:ok '(λ 1 (A 0))]))
+    (t/is (= (syn/parse '((λ [x y] (x y)) (λ [x] x)))
+             [:ok '((λ 2 (0 1)) (λ 1 0))])))
   (t/testing "failed parsing"
-    (t/is (nil? (syn/parse '())))
-    (t/is (nil? (syn/parse '(λ [x y] z))))))
+    (t/is (u/ko-expr? (syn/parse '())))
+    (t/is (u/ko-expr? (syn/parse '(λ [x y] z))))))
 
 ;; Test on prolog vernacular syntax
 
