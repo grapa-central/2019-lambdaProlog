@@ -14,6 +14,7 @@
 ;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
+;; - a suspension (used for explicit substitutions)
 ;;}
 
 (def reserved
@@ -61,6 +62,15 @@
            (not (empty? t)) (not (empty? (rest t)))))
 
 (example (application? '(S O)) => true)
+
+(defn suspension?
+  "Is `t` a suspension ?"
+  [t] (and (vector? t) (= (count t) 4)
+           (nat-int? (nth t 1))
+           (nat-int? (nth t 2))
+           (seq? (nth t 3))))
+
+(example (suspension? ['(S O) 1 0 '()]) => true)
 
 ;;{
 ;; # Type syntax
