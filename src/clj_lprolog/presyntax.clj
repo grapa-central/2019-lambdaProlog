@@ -24,14 +24,10 @@
   [t] (and (syn/lambda? t)
            (proper-kernel-term? (nth t 2))))
 
-(example (proper-lambda? '(λ 2 0)) => true)
-
 (defn proper-application?
   "Is `t` a well-formed application ?"
   [t] (and (syn/application? t)
            (every? proper-kernel-term? t)))
-
-(example (proper-application? '((λ 2 0) A B)) => true)
 
 (defn proper-kernel-term?
   "Is `t` a kernel term ?"
@@ -40,6 +36,9 @@
           (syn/primitive? t)
           (proper-lambda? t)
           (proper-application? t)))
+
+(example (proper-application? '((λ 2 0) A B)) => true)
+(example (proper-lambda? '(λ 2 0)) => true)
 
 ;;{
 ;; # Type syntax
@@ -58,14 +57,14 @@
   [t] (and (syn/arrow-type? t)
            (every? proper-type? (rest t))))
 
-(example (proper-arrow-type? '(-> A (-> B C))) => true)
-
 (defn proper-type?
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
           (syn/nat-type? t)
           (syn/prop-type? t)
           (proper-arrow-type? t)))
+
+(example (proper-arrow-type? '(-> A (-> B C))) => true)
 
 ;;{
 ;; # User terms
