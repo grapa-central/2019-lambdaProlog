@@ -46,7 +46,16 @@
  (rewrite-suspension ['(t1 t2) 'ol 'nl 'e]) => '([t1 ol nl e] [t2 ol nl e])
  (rewrite-suspension ['(λ 2 A) 1 1 '()]) => '(λ 2 [A 3 3 (2 1)]))
 
-(defn beta-red
+(defn apply-suspensions
+  "Recursively apply all the suspensions left in `t`"
+  [t]
+  (cond
+    (syn/lambda? t) (list 'λ (second t) (apply-suspensions (nth t 2)))
+    (syn/application? t) (map apply-suspensions t)
+    (syn/suspension? t) (apply-suspensions (rewrite-suspension t))
+    :else t))
+
+(defn beta-step
   "Beta-reduce `t`, assuming it is a beta-redex"
   [t] (let [abs (first t)
             t2 (second t)
@@ -65,19 +74,19 @@
           (if (empty? tl) hd (cons hd tl)))))
 
 (examples
- (beta-red '((λ 1 0) A)) => '[0 1 0 ([A 0])]
- (beta-red '((λ 2 0) A B)) => '([(λ 1 0) 1 0 ([A 0])] B)
- (beta-red '((λ 2 [A 2 3 (2 [0 1])]) B C)) => '([(λ 1 A) 2 2 ([B 2] [0 1])] C))
+ (beta-step '((λ 1 0) A)) => '[0 1 0 ([A 0])]
+ (beta-step '((λ 2 0) A B)) => '([(λ 1 0) 1 0 ([A 0])] B)
+ (beta-step '((λ 2 [A 2 3 (2 [0 1])]) B C)) => '([(λ 1 A) 2 2 ([B 2] [0 1])] C))
 
 (defn reduce
   "Fully beta reduce `t` using explicit substitutions"
   [t] (loop [t t]
         (cond
-          (syn/beta-redex? t) (recur (beta-red t))
-          (syn/suspension? t) (recur (rewrite-suspension t))
+          (syn/beta-redex? t) (recur (beta-step t))
+          ;; (syn/suspension? t) (recur (rewrite-suspension t))
           (and (syn/application? t) (syn/suspension? (first t)))
           (recur (cons (rewrite-suspension (first t)) (rest t)))
-          :else t)))
+          :else (apply-suspensions t))))
 
 (examples
  (reduce '((λ 1 0) A)) => 'A
