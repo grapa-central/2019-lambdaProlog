@@ -13,11 +13,11 @@
 
 (t/deftest bound?-test
   (t/testing "positive"
-    (t/is (syn/bound? 42)))
+    (t/is (syn/bound? #{42})))
   (t/testing "negative"
     (t/is (not (syn/bound? 'A)))
     (t/is (not (syn/bound? ())))
-    (t/is (not (syn/bound? -1)))))
+    (t/is (not (syn/bound? #{-1})))))
 
 (t/deftest free?-test
   (t/testing "positive"

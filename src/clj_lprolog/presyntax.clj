@@ -38,8 +38,8 @@
           (proper-lambda? t)
           (proper-application? t)))
 
-(example (proper-application? '((λ 2 0) A B)) => true)
-(example (proper-lambda? '(λ 2 0)) => true)
+(example (proper-application? '((λ 2 #{0}) A B)) => true)
+(example (proper-lambda? '(λ 2 #{0})) => true)
 
 ;;{
 ;; # Type syntax
@@ -130,7 +130,7 @@
   (cond (bound-or-const? t)
         (if (contains? (first env) t)
           ;; t is really a bound variable
-          [:ok (get (first env) t)]
+          [:ok #{(get (first env) t)}]
           ;; t is actually a use constant
           [:ok t])
 

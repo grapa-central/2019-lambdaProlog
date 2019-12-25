@@ -23,9 +23,9 @@
 
 (defn bound?
   "Is `t` a bound variable ?"
-  [t] (nat-int? t))
+  [t] (and (set? t) (nat-int? (first t))))
 
-(example (bound? 1) => true)
+(example (bound? #{1}) => true)
 
 (defn free?
   "Is `t` a free variable ?"

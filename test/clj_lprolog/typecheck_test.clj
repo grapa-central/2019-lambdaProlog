@@ -38,28 +38,28 @@
 
 (t/deftest infer-term-test
   (t/testing "positive"
-    (t/is (u/ok-expr? (typ/subst-infer-term {} 0 ['i] 0)))
+    (t/is (u/ok-expr? (typ/subst-infer-term {} #{0} ['i] 0)))
     (t/is (= [:ok 'i] (typ/infer-term '(S (S (S O))))))
     (t/is (= [:ok 'nat] (typ/infer-term {'zero 'nat} 'zero)))
     (t/is (= [:ok 'nat] (typ/infer-term {'succ '(-> nat nat)} '(succ N))))
     (t/is (= [:ok '(-> i i)] (typ/infer-term '(+ (* (S O) (S O))))))
-    (t/is (u/ok-expr? (typ/infer-term '(λ 1 0))))
-    (t/is (u/ok-expr? (typ/infer-term '(λ 2 1))))
-    (t/is (u/ok-expr? (typ/infer-term '((λ 2 1) O))))
-    (t/is (= [:ok '(-> i i)] (typ/infer-term '((λ 2 (+ 0 1)) O))))
+    (t/is (u/ok-expr? (typ/infer-term '(λ 1 #{0}))))
+    (t/is (u/ok-expr? (typ/infer-term '(λ 2 #{1}))))
+    (t/is (u/ok-expr? (typ/infer-term '((λ 2 #{1}) O))))
+    (t/is (= [:ok '(-> i i)] (typ/infer-term '((λ 2 (+ #{0} #{1})) O))))
     (t/is (= [:ok 'i] (typ/infer-term '(λ 0 (S O))))))
   (t/testing "negative"
     (t/is (u/ko-expr? (typ/infer-term '(S S))))
-    (t/is (u/ko-expr? (typ/infer-term '((λ 1 (+ 0 0)) S))))))
+    (t/is (u/ko-expr? (typ/infer-term '((λ 1 (+ #{0} #{0})) S))))))
 
 (t/deftest check-and-elaborate-term-test
   (t/testing "positive"
     (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(S (S (S O))) 'i)))
-    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 1 0) '(-> a a))))
-    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 2 1) '(-> a b a))))
-    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '((λ 2 1) O) '(-> a i)))))
+    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 1 #{0}) '(-> A A))))
+    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 2 #{1}) '(-> A i A))))
+    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '((λ 2 #{1}) O) '(-> A i)))))
   (t/testing "negative"
-    (t/is (u/ko-expr? (typ/check-and-elaborate-term {} '(λ 1 0) '(-> a b))))))
+    (t/is (u/ko-expr? (typ/check-and-elaborate-term {} '(λ 1 #{0}) '(-> A B))))))
 
 ;; Not easy to test metadata simply...
 
@@ -82,9 +82,10 @@
   (t/testing "positive"
     (t/is (= [:ok {'A 'o}] (elab-and-freevars '(λ 1 A) '(-> i o))))
     (t/is (= [:ok {'A 'i}] (elab-and-freevars '((λ 1 A) A) 'i)))
-    (t/is (= [:ok {'A 'i 'B 'i}] (elab-and-freevars '((λ 2 (+ 0 1)) A B) 'i))))
+    (t/is (= [:ok {'A 'i 'B 'i}]
+             (elab-and-freevars '((λ 2 (+ #{0} #{1})) A B) 'i))))
   (t/testing "negative"
-    (t/is (u/ko-expr? (elab-and-freevars '((λ 1 (+ (A O) 0)) A) 'i)))))
+    (t/is (u/ko-expr? (elab-and-freevars '((λ 1 (+ (A O) #{0})) A) 'i)))))
 
 (t/deftest check-pred-test
   (t/testing "even"

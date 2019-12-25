@@ -21,14 +21,14 @@
           ;; r2 : t is an instantiatable variable
           (syn/free? t) t
           ;; r3 : i > ol and j = i - ol + nl
-          (and (syn/bound? t) (> t ol))
-          (+ (- t ol) nl)
+          (and (syn/bound? t) (> (first t) ol))
+          #{(+ (- (first t) ol) nl)}
           ;; r4 : i <= ol, e[i] = @l and j = nl - l
-          (and (syn/bound? t) (<= t ol) (nat-int? (nth e t)))
-          (- nl (nth e t))
+          (and (syn/bound? t) (<= (first t) ol) (nat-int? (nth e (first t))))
+          #{(- nl (nth e (first t)))}
           ;; r5 : i <= ol, e[i] = (t, l) and j = nl - l
-          (and (syn/bound? t) (<= t ol) (vector? (nth e t)))
-          [(first (nth e t)) 0 (- nl (second (nth e t))) '()]
+          (and (syn/bound? t) (<= (first t) ol) (vector? (nth e (first t))))
+          [(first (nth e (first t))) 0 (- nl (second (nth e (first t)))) '()]
           ;; r6 : t is an application
           (syn/application? t) (map (fn [t] [t ol nl e]) t)
           ;; r7 : t is an abstraction
@@ -74,9 +74,10 @@
           (if (empty? tl) hd (cons hd tl)))))
 
 (examples
- (beta-step '((λ 1 0) A)) => '[0 1 0 ([A 0])]
- (beta-step '((λ 2 0) A B)) => '([(λ 1 0) 1 0 ([A 0])] B)
- (beta-step '((λ 2 [A 2 3 (2 [0 1])]) B C)) => '([(λ 1 A) 2 2 ([B 2] [0 1])] C))
+ (beta-step '((λ 1 #{0}) A)) => '[#{0} 1 0 ([A 0])]
+ (beta-step '((λ 2 #{0}) A B)) => '([(λ 1 #{0}) 1 0 ([A 0])] B)
+ (beta-step '((λ 2 [A 2 3 (2 [#{0} 1])]) B C)) =>
+ '([(λ 1 A) 2 2 ([B 2] [#{0} 1])] C))
 
 (defn reduce
   "Fully beta reduce `t` using explicit substitutions"
@@ -89,6 +90,6 @@
           :else (apply-suspensions t))))
 
 (examples
- (reduce '((λ 1 0) A)) => 'A
- (reduce '((λ 1 0) A B)) => '(A B)
- (reduce '((λ 2 0) A B)) => 'B)
+ (reduce '((λ 1 #{0}) A)) => 'A
+ (reduce '((λ 1 #{0}) A B)) => '(A B)
+ (reduce '((λ 2 #{0}) A B)) => 'B)

@@ -7,24 +7,24 @@
 
 (t/deftest proper-kernel-lambda?-test
   (t/testing "positive"
-    (t/is (syn/proper-lambda? '(λ 2 1))))
+    (t/is (syn/proper-lambda? '(λ 2 #{1}))))
   (t/testing "negative"
-    (t/is (not (syn/proper-lambda? '(l 2 1))))
-    (t/is (not (syn/proper-lambda? '(λ -1 1))))
+    (t/is (not (syn/proper-lambda? '(l 2 #{1}))))
+    (t/is (not (syn/proper-lambda? '(λ -1 #{1}))))
     (t/is (not (syn/proper-lambda? '(λ 1 ()))))))
 
 (t/deftest proper-kernel-application?-test
   (t/testing "positive"
-    (t/is (syn/proper-application? '(A 1 2))))
+    (t/is (syn/proper-application? '(A #{1} #{2}))))
   (t/testing "negative"
     (t/is (not (syn/proper-application? '())))
     (t/is (not (syn/proper-application? '(A))))
     (t/is (not (syn/proper-application? '(A ()))))))
 
 (t/deftest proper-kernel-term?-test
-  (t/is (syn/proper-kernel-term? 1))
+  (t/is (syn/proper-kernel-term? #{1}))
   (t/is (syn/proper-kernel-term? 'A))
-  (t/is (syn/proper-kernel-term? '(λ 2 (1 0))))
+  (t/is (syn/proper-kernel-term? '(λ 2 (#{1} #{2}))))
   (t/is (syn/proper-kernel-term? '(A B))))
 
 ;; Tests on proper type syntax
@@ -84,12 +84,12 @@
 
 (t/deftest parse-test
   (t/testing "successful parsing"
-    (t/is (= (syn/parse '(S N)) [:ok '(S N)]))
-    (t/is (= (syn/parse '(λ [x y] (x y))) [:ok '(λ 2 (0 1))]))
-    (t/is (= (syn/parse '(λ [x] (+ x zero))) [:ok '(λ 1 (+ 0 zero))]))
-    (t/is (= (syn/parse '(λ [x] (A x))) [:ok '(λ 1 (A 0))]))
-    (t/is (= (syn/parse '((λ [x y] (x y)) (λ [x] x)))
-             [:ok '((λ 2 (0 1)) (λ 1 0))])))
+    (t/is (= [:ok '(S N)] (syn/parse '(S N))))
+    (t/is (= [:ok '(λ 2 (#{0} #{1}))] (syn/parse '(λ [x y] (x y)))))
+    (t/is (= [:ok '(λ 1 (+ #{0} zero))] (syn/parse '(λ [x] (+ x zero)))))
+    (t/is (= [:ok '(λ 1 (A #{0}))] (syn/parse '(λ [x] (A x)))))
+    (t/is (= [:ok '((λ 2 (#{0} #{1})) (λ 1 #{0}))]
+             (syn/parse '((λ [x y] (x y)) (λ [x] x))))))
   (t/testing "failed parsing"
     (t/is (u/ko-expr? (syn/parse '())))))
 
@@ -184,8 +184,9 @@
                                         {'(even O) '()
                                          '(even (S (S N))) '((even N))}]}))))
   (t/testing "is the identity"
-    (do (syn/start)
-        (syn/defpred 'isid '(-> (-> A A) o))
-        (syn/addclause '((isid (λ [x] x))))
-        (t/is (= @syn/progpreds {'isid ['(-> (-> A A) o)
-                                        {'(isid (λ 1 0)) '()}]})))))
+    (do
+      (swap! syn/progpreds (fn [_] {}))
+      (syn/defpred 'isid '(-> (-> A A) o))
+      (syn/addclause '((isid (λ [x] x))))
+      (t/is (= @syn/progpreds {'isid ['(-> (-> A A) o)
+                                      {'(isid (λ 1 #{0})) '()}]})))))
