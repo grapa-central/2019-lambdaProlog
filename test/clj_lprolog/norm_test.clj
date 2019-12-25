@@ -1,6 +1,7 @@
 (ns clj-lprolog.norm-test
   (:require [clj-lprolog.norm :as nor]
-            [clojure.test :as t]))
+            [clojure.test :as t]
+            [clj-lprolog.typecheck :as typ]))
 
 (t/deftest rewrite-suspension-test
   (t/is (= '([t1 ol nl e] [t2 ol nl e])
@@ -20,3 +21,11 @@
   (t/is (= 'B (nor/reduce '((λ 2 #{0}) A B))))
   (t/is (= 'A (nor/reduce '((λ 2 #{1}) A B))))
   (t/is (= '(A B) (nor/reduce '((λ 2 (#{1} #{0})) A B)))))
+
+(defn test-reduce-meta
+  [t] (binding [*print-meta* true]
+        (do (pr (nor/reduce (second (typ/elaborate-term t))))
+            (println ""))))
+
+;;(test-reduce-meta '((λ 2 (#{0} A)) A B))
+;;(test-reduce-meta '((λ 2 (λ 1 (#{0} A))) A B))

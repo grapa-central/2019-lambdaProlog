@@ -52,6 +52,11 @@
     (t/is (u/ko-expr? (typ/infer-term '(S S))))
     (t/is (u/ko-expr? (typ/infer-term '((λ 1 (+ #{0} #{0})) S))))))
 
+(t/deftest elaborate-term-test
+  (t/testing "elaborated terms stay the same"
+    (t/is (= '((λ 2 #{0}) A B)
+             (second (typ/elaborate-term '((λ 2 #{0}) A B)))))))
+
 (t/deftest check-and-elaborate-term-test
   (t/testing "positive"
     (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(S (S (S O))) 'i)))

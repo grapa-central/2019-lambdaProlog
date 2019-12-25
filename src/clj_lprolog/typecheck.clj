@@ -61,10 +61,15 @@
                            (not (or (type-unif-var? y1)
                                     (type-unif-var? y2))))))) s1))
 
+(defn apply-subst-subst
+  "Apply `s1` to every value of `s2`"
+  [s1 s2] (u/map-of-pair-list
+           (map (fn [[k ty]] [k (apply-subst-ty s1 ty)]) s2)))
+
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
   [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
-               [:ok (conj s1 s2)]))
+               [:ok (conj s1 (apply-subst-subst s1 s2))]))
 
 (examples
  (compose-subst {'ty1 'i} {'ty2 'o}) =>
@@ -270,6 +275,7 @@
         (syn/application? t) (get (meta t) :ty)
         (syn/lambda? t) (get (meta t) :ty)
         (syn/suspension? t) (type-of (first t))))
+
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
