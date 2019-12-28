@@ -18,7 +18,6 @@
     (t/is (syn/proper-application? '(A #{1} #{2}))))
   (t/testing "negative"
     (t/is (not (syn/proper-application? '())))
-    (t/is (not (syn/proper-application? '(A))))
     (t/is (not (syn/proper-application? '(A ()))))))
 
 (t/deftest proper-kernel-term?-test
@@ -74,13 +73,6 @@
   (t/testing "negative"
     (t/is (not (syn/lambda? '(l [x y] 1))))
     (t/is (not (syn/lambda? '(λ 1 x))))))
-
-(t/deftest application?-test
-  (t/testing "positive"
-    (t/is (syn/application? '(A x y))))
-  (t/testing "negative"
-    (t/is (not (syn/application? '())))
-    (t/is (not (syn/application? '(A))))))
 
 (t/deftest parse-test
   (t/testing "successful parsing"

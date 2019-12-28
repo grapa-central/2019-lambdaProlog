@@ -50,22 +50,17 @@
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
-  [t] (and (seq? t)
+  [t] (and (seq? t) (= (count t) 3)
            (= (first t) 'λ)
            (nat-int? (second t))))
 
 (example (lambda? '(λ 2 (+ 1 0))) => true)
 
-(defn flatten-zero-lambda
-  "Transform `t`, a lambda into its body if the lambda abstract over 0 bindings.
-  Return unchanged `t` otherwise"
-  [t] (if (zero? (second t)) (nth t 2) t))
-
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
            (not= (first t) 'λ)
-           (not (empty? t)) (not (empty? (rest t)))))
+           (not (empty? t))))
 
 (example (application? '(S O)) => true)
 

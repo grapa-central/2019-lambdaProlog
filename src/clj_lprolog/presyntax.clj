@@ -103,18 +103,11 @@
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
-  [t] (and (seq? t)
+  [t] (and (seq? t) (= (count t) 3)
            (= (first t) 'λ)
            (vector? (second t)) (every? bound-or-const? (second t))))
 
 (example (lambda? '(λ [x y] (+ x y))) => true)
-
-(defn application?
-  "Is `t` an application ?"
-  [t] (and (seq? t)
-           (not (empty? t)) (not (empty? (rest t)))))
-
-(example (application? '(A B)) => true)
 
 (defn user-term?
   "Is `t` a user term ?"
@@ -122,7 +115,7 @@
           (free? t)
           (syn/primitive? t)
           (lambda? t)
-          (application? t)))
+          (syn/application? t)))
 
 (defn parse-aux
   "Parse a user term `t` to a kernel term using a naming environment"
@@ -148,7 +141,7 @@
                       env (second t))) :as [_ t']
         [:ok (list 'λ (count (second t)) t')])
 
-        (application? t)
+        (syn/application? t)
         (ok> (u/ok-map (fn [t] (parse-aux t env)) t) :as [_ t']
              [:ok (map (fn [[t]] t) t')])
 
