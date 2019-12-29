@@ -66,7 +66,8 @@
 
 (defn beta-redex?
   "Is `t` a beta-redex ?"
-  [t] (and (application? t) (lambda? (first t))))
+  [t] (and (application? t) (>= (count t) 2)
+           (lambda? (first t))))
 
 (defn suspension?
   "Is `t` a suspension ?"
