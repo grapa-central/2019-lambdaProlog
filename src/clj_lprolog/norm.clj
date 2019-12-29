@@ -90,7 +90,7 @@
 ;;}
 
 (defn implicit-subst
-  "Substitute `v` to the bound variable of index `n` in `t`"
+  "Substitute `v` to the bound variable of index `n` (default to 0) in `t`"
   ([v t] (implicit-subst 0 v t))
   ([n v t] (with-meta
             (cond
@@ -222,6 +222,12 @@
  (explicit-reduce '((λ 1 #{0}) A)) => 'A
  (explicit-reduce '((λ 1 #{0}) A B)) => '(A B)
  (explicit-reduce '((λ 2 #{0}) A B)) => 'B)
+
+;;{
+;; # Normalization
+;;
+;; Beta-reduce and eta-expand a term to get its head-normal form
+;;}
 
 (defn norm-beta
   "Beta-reduction part of the normalization of `t`"

@@ -27,6 +27,20 @@
            (nor/rewrite-suspension ['(t1 t2) 1 2 ()])))
   (t/is (= '(λ 2 [A 3 3 (2 1)]) (nor/rewrite-suspension ['(λ 2 A) 1 1 '()]))))
 
+;; Tests on implicit beta-reduction
+
+(t/deftest implicit-subst-test
+  (t/is (= '(S O) (nor/implicit-subst 2 'O '(S #{2}))))
+  (t/is (= '((λ 1 #{0}) A) (nor/implicit-subst 'A '((λ 1 #{0}) #{0}))))
+  (t/is (= '((λ 1 A) A) (nor/implicit-subst 'A '((λ 1 #{1}) #{0}))))
+  (t/is (= '((λ 1 #{1}) A) (nor/implicit-subst 1 'A '((λ 1 #{1}) #{1})))))
+
+(t/deftest implicit-reduce-test
+  (t/is (= '(S O) (nor/implicit-reduce '((λ 1 (S #{0})) O))))
+  (t/is (= '(A B) (nor/implicit-reduce '((λ 2 (#{0} #{1})) B A))))
+  (t/is (= '(λ 1 (#{0} B)) (nor/implicit-reduce '((λ 2 (#{0} #{1})) B))))
+  (t/is (= 'A (nor/implicit-reduce '((λ 1 (#{0} A)) (λ 1 #{0}))))))
+
 ;; Tests on explicit beta-reduction
 
 (t/deftest beta-step-test
@@ -36,23 +50,40 @@
   (t/is (= '([(λ 1 A) 2 2 ([B 2] [#{0} 1])] C)
            (nor/beta-step '((λ 2 [A 2 3 (2 [#{0} 1])]) B C)))))
 
-(t/deftest beta-reduce-test
+(t/deftest explicit-beta-reduce-test
   (t/is (= 'A (nor/explicit-reduce '((λ 1 #{0}) A))))
   (t/is (= '(A B) (nor/explicit-reduce '((λ 1 #{0}) A B))))
   (t/is (= 'B (nor/explicit-reduce '((λ 2 #{0}) A B))))
   (t/is (= 'A (nor/explicit-reduce '((λ 2 #{1}) A B))))
   (t/is (= '(A B) (nor/explicit-reduce '((λ 2 (#{1} #{0})) A B)))))
 
-(defn test-reduce-meta
-  [t] (binding [*print-meta* true]
-        (do (pr (nor/explicit-reduce (second (typ/elaborate-term t))))
-            (println ""))))
+;; Tests on normalization
+
+(t/deftest lift-indices-test
+  (t/is (= #{2} (nor/lift-indices 2 #{0})))
+  (t/is (= '(λ 1 #{0}) (nor/lift-indices 1 '(λ 1 #{0}))))
+  (t/is (= '(λ 1 #{3}) (nor/lift-indices 2 '(λ 1 #{1}))))
+  (t/is (= '((λ 1 #{2}) #{1}) (nor/lift-indices 1 '((λ 1 #{1}) #{0})))))
+
+(defn eta
+  [t] (nor/norm-eta (second (typ/elaborate-term t))))
+
+(t/deftest norm-eta-test
+  (t/is (= '(λ 2 #{0}) (eta '(λ 2 #{0}))))
+  (t/is (= '(λ 3 ((λ 2 (S #{0})) #{1} #{0})) (eta '(λ 1 (λ 2 (S #{0})))))))
+
+(defn normalize
+  [t] (nor/normalize (second (typ/elaborate-term t))))
+
+(t/deftest normalize-test
+  (t/is '(λ 0 (A)) (normalize '((λ 1 #{0}) A)))
+  (t/is (= '(λ 2 (A #{0})) (normalize '((λ 1 (λ 1 #{1})) (λ 1 (A #{0})))))))
 
 (defn test-normalize-meta
   [t] (binding [*print-meta* true]
-        (do (pr (nor/normalize (second (typ/elaborate-term t))))
+        (do (pr (normalize t))
             (println ""))))
 
 ;;(test-normalize-meta '((λ 2 (#{0} A)) A B))
-(test-normalize-meta '((λ 1 (λ 1 #{1})) (λ 3 (A #{0}))))
+;;(test-normalize-meta '((λ 1 (λ 1 #{1})) (λ 3 (A #{0}))))
 ;;(test-reduce-meta '((λ 2 (λ 1 (#{0} A))) A B))
