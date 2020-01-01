@@ -293,3 +293,14 @@
 (defn map-of-pair-list
   "Turn a list of pairs into a map"
   [l] (reduce (fn [m [k v]] (assoc m k v)) {} l))
+
+(defn remove-first
+  "Remove the first item of `l` that satisfies `p`"
+  [p l] (loop [l l res '()]
+          (cond (empty? l) (reverse res)
+                (p (first l)) (concat (reverse res) (rest l))
+                :else (recur (rest l) (cons (first l) res)))))
+
+(examples
+ (remove-first even? '(1 3 5 7 10)) => '(1 3 5 7)
+ (remove-first even? '(1 3 4 5 7 10)) => '(1 3 5 7 10))
