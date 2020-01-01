@@ -14,21 +14,6 @@
 ;; All these transformations preserve type information
 ;;}
 
-(defn flatten-lambda
-  "Flatten `t`, with `t` some nested lambdas (at least one)"
-  [t] (if (syn/lambda? (nth t 2))
-        (let [lam' (flatten-lambda (nth t 2))
-              n' (second lam')
-              t' (nth lam' 2)]
-          (with-meta
-            (list 'λ (+ (second t) n') t')
-            {:ty (typ/type-of t)}))
-        t))
-
-(example
- (flatten-lambda '(λ 2 (λ 1 (#{0} #{1})))) =>
- '(λ 3 (#{0} #{1})))
-
 (defn flatten-zero-lambda
   "Transform `t`, a lambda into its body if the lambda abstract over 0 bindings.
   Return unchanged `t` otherwise"
@@ -36,13 +21,20 @@
         (if (zero? (second t)) (nth t 2) t)
         {:ty (typ/type-of t)}))
 
-(defn one-less-lambda
-  "Remove the first binding of `t`, a lambda. Flatten if there is no binding left.
-   Update typing information"
+(defn flatten-lambda
+  "Flatten `t`, with `t` some nested lambdas (at least one)"
   [t] (with-meta
-        (flatten-zero-lambda
-         (list 'λ (dec (second t)) (nth t 2)))
-        {:ty (second (syn/destruct-arrow (typ/type-of t) 1))}))
+        (if (syn/lambda? (nth t 2))
+        (let [lam' (flatten-lambda (nth t 2))
+              n' (second lam')
+              t' (nth lam' 2)]
+          (list 'λ (+ (second t) n') t'))
+        t)
+        {:ty (typ/type-of t)}))
+
+(example
+ (flatten-lambda '(λ 2 (λ 1 (#{0} #{1})))) =>
+ '(λ 3 (#{0} #{1})))
 
 (defn lambda-form
   "Put a term `t` in lambda form: if it is already a lambda, return `t`,
@@ -52,6 +44,13 @@
         {:ty (typ/type-of t)}))
 
 (example (lambda-form '(A B)) => '(λ 0 (A B)))
+
+(defn flatten-one-application
+  "Transform `t`, an application into its head if it is applied to 0 arguments.
+  Return unchanged `t` otherwise"
+  [t] (with-meta
+        (if (= (count t) 1) (first t) t)
+        {:ty (typ/type-of t)}))
 
 (defn flatten-application
   "Flatten `t` using left associativity,
@@ -65,13 +64,6 @@
 
 (example
  (flatten-application '((A B C) D E)) => '(A B C D E))
-
-(defn flatten-one-application
-  "Transform `t`, an application into its head if it is applied to 0 arguments.
-  Return unchanged `t` otherwise"
-  [t] (with-meta
-        (if (= (count t) 1) (first t) t)
-        {:ty (typ/type-of t)}))
 
 (defn application-form
   "Put a term `t` in an application form : if it is already an application,
@@ -88,6 +80,14 @@
 ;; First version of beta reduction, using simple implicit substitutions.
 ;; To be improved later
 ;;}
+
+(defn one-less-lambda
+  "Remove the first binding of `t`, a lambda. Flatten if there is no binding left.
+   Update typing information"
+  [t] (with-meta
+        (flatten-zero-lambda
+         (list 'λ (dec (second t)) (nth t 2)))
+        {:ty (second (syn/destruct-arrow (typ/type-of t) 1))}))
 
 (defn implicit-subst
   "Substitute `v` to the bound variable of index `n` (default to 0) in `t`"
@@ -229,10 +229,26 @@
 ;; Beta-reduce and eta-expand a term to get its head-normal form
 ;;}
 
+(defn simplify-term
+  "Recursively simplify a term as much as possible"
+  [t] (with-meta
+        (cond
+          ;; t is an abstraction
+          (syn/lambda? t)
+          (flatten-zero-lambda
+           (flatten-lambda (list 'λ (second t) (simplify-term (nth t 2)))))
+          ;; t is an application
+          (syn/application? t)
+          (flatten-one-application
+           (flatten-application (map simplify-term t)))
+          :else t)
+        {:ty (typ/type-of t)}))
+
+(example (simplify-term '(λ 0 ((λ 0 ((λ 0 (S))))))) => 'S)
+
 (defn norm-beta
   "Beta-reduction part of the normalization of `t`"
   [t] (-> t
-          application-form flatten-application
           implicit-reduce ;; TODO use explicit-reduce ?
           lambda-form flatten-lambda
            (#(with-meta (list 'λ (second %) (application-form (nth % 2)))
@@ -266,9 +282,9 @@
                 args (take n (iterate
                               (fn [s] (with-meta #{(dec (first s))}
                                        {:ty (nth ty (- n (dec (first s))))}))
-                              (with-meta #{(- n (second t))}
+                              (with-meta #{(dec n)}
                                 {:ty (nth ty 1)})))]
-            (with-meta (list 'λ (+ (second t) n)
+            (with-meta (list 'λ (+ n (second t))
                              (with-meta
                                (flatten-application
                                 (cons (lift-indices n (nth t 2)) args))
@@ -277,11 +293,11 @@
           t)))
 
 (example
- (norm-eta (second (typ/elaborate-term '(λ 1 (λ 2 (S #{0}))))))
+ (norm-eta (second (typ/elaborate-term {} '(λ 1 (λ 2 (S #{0}))))))
  => '(λ 3 ((λ 2 (S #{0})) #{1} #{0})))
 
 (defn normalize
   "Normalize `t`, using eta-expansion and beta-reduction"
-  [t] (-> t norm-beta norm-eta))
+  [t] (-> t simplify-term norm-beta norm-eta))
 
 (example (normalize '((λ 1 (λ 1 #{1})) (λ 1 (A #{0})))) => '(λ 2 (A #{0})))

@@ -59,14 +59,6 @@
     (t/is (not (syn/bound-or-const? ())))
     (t/is (not (syn/bound-or-const? -1)))))
 
-(t/deftest free?-test
-  (t/testing "positive"
-    (t/is (syn/free? 'A)))
-  (t/testing "negative"
-    (t/is (not (syn/free? 'O)))
-    (t/is (not (syn/free? 'a)))
-    (t/is (not (syn/free? ())))))
-
 (t/deftest lambda?-test
   (t/testing "positive"
     (t/is (syn/lambda? '(λ [x y] x))))

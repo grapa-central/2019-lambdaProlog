@@ -93,14 +93,6 @@
 
 (example (bound-or-const? 'x) => true)
 
-(defn free?
-  "Is `t` a free variable ?"
-  [t] (and (symbol? t)
-           (not (some #{t} syn/reserved))
-           (= (symbol (str/capitalize t)) t)))
-
-(example (free? 'X) => true)
-
 (defn lambda?
   "Is `t` a λ-abstraction ?"
   [t] (and (seq? t) (= (count t) 3)
@@ -112,7 +104,7 @@
 (defn user-term?
   "Is `t` a user term ?"
   [t] (or (bound-or-const? t)
-          (free? t)
+          (syn/free? t)
           (syn/primitive? t)
           (lambda? t)
           (syn/application? t)))
@@ -127,7 +119,7 @@
           ;; t is actually a use constant
           [:ok t])
 
-        (free? t) [:ok t]
+        (syn/free? t) [:ok t]
 
         (syn/primitive? t) [:ok t]
 
