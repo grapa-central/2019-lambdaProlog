@@ -274,16 +274,22 @@
 (example (lift-indices 2 '((λ 2 (#{0} #{2})) #{1}))
          => '((λ 2 (#{0} #{4})) #{3}))
 
+(defn eta-params
+  "Generate the parameters for the application of a constructor of type `ty`,
+  in reverse order"
+  [ty] (let [n (count (syn/param-types ty))]
+         (take n (iterate
+                  (fn [s] (with-meta #{(dec (first s))}
+                           {:ty (nth ty (- n (dec (first s))))}))
+                  (with-meta #{(dec n)}
+                    {:ty (nth ty 1)})))))
+
 (defn norm-eta
   "Eta-expansion part of the normalization of `t`"
   [t] (let [ty (typ/type-of (nth t 2))]
         (if (syn/arrow-type? ty)
           (let [n (- (count ty) 2)
-                args (take n (iterate
-                              (fn [s] (with-meta #{(dec (first s))}
-                                       {:ty (nth ty (- n (dec (first s))))}))
-                              (with-meta #{(dec n)}
-                                {:ty (nth ty 1)})))]
+                args (eta-params ty)]
             (with-meta (list 'λ (+ n (second t))
                              (with-meta
                                (flatten-application
