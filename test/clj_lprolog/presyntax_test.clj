@@ -46,13 +46,13 @@
 
 ;; Tests on user terms syntax
 
-(t/deftest bound?-test
+(t/deftest bound-or-const?-test
   (t/testing "positive"
-    (t/is (syn/bound? 'a)))
+    (t/is (syn/bound-or-const? 'a)))
   (t/testing "negative"
-    (t/is (not (syn/bound? 'A)))
-    (t/is (not (syn/bound? ())))
-    (t/is (not (syn/bound? -1)))))
+    (t/is (not (syn/bound-or-const? 'A)))
+    (t/is (not (syn/bound-or-const? ())))
+    (t/is (not (syn/bound-or-const? -1)))))
 
 (t/deftest free?-test
   (t/testing "positive"
@@ -80,13 +80,12 @@
   (t/testing "successful parsing"
     (t/is (= (syn/parse '(S N)) [:ok '(S N)]))
     (t/is (= (syn/parse '(λ [x y] (x y))) [:ok '(λ 2 (0 1))]))
-    (t/is (= (syn/parse '(λ [x y] (+ x y))) [:ok '(λ 2 (+ 0 1))]))
+    (t/is (= (syn/parse '(λ [x] (+ x zero))) [:ok '(λ 1 (+ 0 zero))]))
     (t/is (= (syn/parse '(λ [x] (A x))) [:ok '(λ 1 (A 0))]))
     (t/is (= (syn/parse '((λ [x y] (x y)) (λ [x] x)))
              [:ok '((λ 2 (0 1)) (λ 1 0))])))
   (t/testing "failed parsing"
-    (t/is (u/ko-expr? (syn/parse '())))
-    (t/is (u/ko-expr? (syn/parse '(λ [x y] z))))))
+    (t/is (u/ko-expr? (syn/parse '())))))
 
 ;; Test on prolog vernacular syntax
 
@@ -119,35 +118,49 @@
   (t/testing "negative"
     (t/is (not (syn/clause? '(even O)))))) ;; Parenthesis !
 
-;; Testing on defpred and addclause
+;; Testing on macros
+
+(t/deftest deftype-test
+  (t/testing "nat"
+    (do (syn/start)
+        (syn/deftype 'nat)
+        (t/is (= '#{nat} @syn/progtypes)))))
+
+(t/deftest defconst-test
+  (t/testing "bool"
+    (do (syn/start)
+        (syn/deftype 'bool)
+        (syn/defconst 't 'bool) (syn/defconst 'f 'bool)
+        (t/is (= '{t bool f bool} @syn/progconsts))))
+  (t/testing "nat"
+    (do (syn/start)
+        (syn/deftype 'nat)
+        (syn/defconst 'zero 'nat) (syn/defconst 'succ '(-> nat nat))
+        (t/is (= '{zero nat succ (-> nat nat)} @syn/progconsts)))))
 
 (t/deftest defpred-test
   (t/testing "even"
-    (do
-      (swap! syn/progpreds (fn [_] {}))
-      (syn/defpred 'even '(-> i o))
-      (t/is (= @syn/progpreds {'even ['(-> i o) {}]}))))
+    (do (syn/start)
+        (syn/defpred 'even '(-> i o))
+        (t/is (= @syn/progpreds {'even ['(-> i o) {}]}))))
   (t/testing "even and odd"
-    (do
-      (swap! syn/progpreds (fn [_] {}))
-      (syn/defpred 'even '(-> i o))
-      (syn/defpred 'odd '(-> i o))
-      (t/is (= (get @syn/progpreds 'even) (get @syn/progpreds 'odd))))))
+    (do (syn/start)
+        (syn/defpred 'even '(-> i o))
+        (syn/defpred 'odd '(-> i o))
+        (t/is (= (get @syn/progpreds 'even) (get @syn/progpreds 'odd))))))
 
 (t/deftest addclause-test
   (t/testing "even"
-    (do
-      (swap! syn/progpreds (fn [_] {}))
-      (syn/defpred 'even '(-> i o))
-      (syn/addclause '((even O)))
-      (syn/addclause '((even (S (S N))) :- (even N)))
-      (t/is (= @syn/progpreds {'even ['(-> i o)
-                                      {'(even O) '()
-                                       '(even (S (S N))) '((even N))}]}))))
+    (do (syn/start)
+        (syn/defpred 'even '(-> i o))
+        (syn/addclause '((even O)))
+        (syn/addclause '((even (S (S N))) :- (even N)))
+        (t/is (= @syn/progpreds {'even ['(-> i o)
+                                        {'(even O) '()
+                                         '(even (S (S N))) '((even N))}]}))))
   (t/testing "is the identity"
-    (do
-      (swap! syn/progpreds (fn [_] {}))
-      (syn/defpred 'isid '(-> (-> A A) o))
-      (syn/addclause '((isid (λ [x] x))))
-      (t/is (= @syn/progpreds {'isid ['(-> (-> A A) o)
-                                      {'(isid (λ 1 0)) '()}]})))))
+    (do (syn/start)
+        (syn/defpred 'isid '(-> (-> A A) o))
+        (syn/addclause '((isid (λ [x] x))))
+        (t/is (= @syn/progpreds {'isid ['(-> (-> A A) o)
+                                        {'(isid (λ 1 0)) '()}]})))))

@@ -11,7 +11,7 @@
 ;; A kernel lambda-term is either:
 ;; - a bound variable (identified by its De Bruijn index)
 ;; - a free (substituable) variable (identified by a symbol)
-;; - a primitive constant (∀, =>, O, S, +, *)
+;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
 ;;}
@@ -28,7 +28,8 @@
 
 (defn free?
   "Is `t` a free variable ?"
-  [t] (and (symbol? t) (not (some #{t} reserved))))
+  [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)
+           (not (some #{t} reserved))))
 
 (example (free? 'A) => true)
 
@@ -39,6 +40,12 @@
 (examples
  (primitive? 'S) => true
  (primitive? '+) => true)
+
+(defn user-const?
+  "Is `t` a user constant ?"
+  [t] (and (symbol? t) (= (symbol (str/lower-case t)) t)))
+
+(example (user-const? 'zero) => true)
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
@@ -62,6 +69,7 @@
 ;; - a type variable (identified by an capitalized symbol)
 ;; - the primitive "nat" type `i`
 ;; - the primitive "prop" type `o`
+;; - a user type
 ;; - a n-ary arrow type
 ;;}
 
@@ -83,6 +91,13 @@
   [t] (= t 'o))
 
 (example (prop-type? 'o) => true)
+
+(defn user-type?
+  "Is `t` a user type ?"
+  [t] (and (symbol? t)
+           (= (symbol (str/lower-case t)) t)))
+
+(example (user-type? 'nat) => true)
 
 (defn arrow-type?
   "Is `t` an arrow type ?"

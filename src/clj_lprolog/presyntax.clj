@@ -12,7 +12,7 @@
 ;; A kernel lambda-term is either:
 ;; - a bound variable (identified by its De Bruijn index)
 ;; - a free (substituable) variable (identified by a symbol)
-;; - a primitive constant (∀, =>, O, S, +, *)
+;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
 ;;}
@@ -34,6 +34,7 @@
   [t] (or (syn/bound? t)
           (syn/free? t)
           (syn/primitive? t)
+          (syn/user-const? t)
           (proper-lambda? t)
           (proper-application? t)))
 
@@ -60,8 +61,9 @@
 (defn proper-type?
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
-          (syn/nat-type? t)
           (syn/prop-type? t)
+          (syn/nat-type? t)
+          (syn/user-type? t)
           (proper-arrow-type? t)))
 
 (example (proper-arrow-type? '(-> A (-> B C))) => true)
@@ -77,13 +79,13 @@
 ;; - a n-ary application
 ;;}
 
-(defn bound?
-  "Is `t` a bound variable ?"
+(defn bound-or-const?
+  "Is `t` a bound variable or a constant ?"
   [t] (and (symbol? t)
            (not (some #{t} syn/reserved))
            (not= (symbol (str/capitalize t)) t)))
 
-(example (bound? 'x) => true)
+(example (bound-or-const? 'x) => true)
 
 (defn free?
   "Is `t` a free variable ?"
@@ -97,7 +99,7 @@
   "Is `t` a λ-abstraction ?"
   [t] (and (seq? t)
            (= (first t) 'λ)
-           (vector? (second t)) (every? bound? (second t))))
+           (vector? (second t)) (every? bound-or-const? (second t))))
 
 (example (lambda? '(λ [x y] (+ x y))) => true)
 
@@ -110,7 +112,7 @@
 
 (defn user-term?
   "Is `t` a user term ?"
-  [t] (or (bound? t)
+  [t] (or (bound-or-const? t)
           (free? t)
           (syn/primitive? t)
           (lambda? t)
@@ -119,10 +121,12 @@
 (defn parse-aux
   "Parse a user term `t` to a kernel term using a naming environment"
   [t env]
-  (cond (bound? t)
-        (ok> (when (not (contains? (first env) t))
-               [:ko 'bound-not-in-env {:var t :env (first env)}])
-             [:ok (get (first env) t)])
+  (cond (bound-or-const? t)
+        (if (contains? (first env) t)
+          ;; t is really a bound variable
+          [:ok (get (first env) t)]
+          ;; t is actually a use constant
+          [:ok t])
 
         (free? t) [:ok t]
 
@@ -212,13 +216,32 @@
            [:ko> 'parsing-clause {:clause c}]
            [:ok (cons hd (map (fn [[t]] t) tl))]))
 
-;; Contains the set of predicates during execution of the program !
-;; (maybe not ideal, see with a clojure expert how to do it better)
+;; Contains the set of user types during execution of the program
+(def progtypes (atom #{}))
+
+(defmacro deftype
+  "Define a type. `n` is the name of the type, it should be lowercase"
+  [n] `(if (syn/user-type? ~n)
+         (swap! progtypes (fn [pt#] (conj pt# ~n)))
+         [:ko 'deftype {:n ~n}]))
+
+;; Contains the set of constants (and their types) during execution of the program
+(def progconsts (atom {}))
+
+(defmacro defconst
+  "Define a constant `n` (should be lowercase),
+  with its type `ty`. Checks well formedness"
+  [n ty] `(if (and (symbol? ~n) (= (symbol (str/lower-case ~n)) ~n)
+                   (proper-type? ~ty))
+            (swap! progconsts (fn [pc#] (assoc pc# ~n ~ty)))
+            [:ko 'defconst {:n ~n :ty ~ty}]))
+
+;; Contains the set of predicates during execution of the program
 (def progpreds (atom {}))
 
 (defmacro defpred
   "Define a predicate. `n` is the name of the predicate, and `t` its type
-  Also checks that the predicate is well formed. If it's not, return nil"
+  Also check well-formedness"
   [n t]
   `(if (and (pred? ~n) (proper-type? ~t))
      (swap! progpreds (fn [pp#] (assoc pp# ~n [~t {}])))
@@ -238,3 +261,9 @@
                       (assoc pp# (first head#)
                              (list (first prev#)
                                    (assoc (second prev#) head# body#))))))))))
+
+(defn start
+  "Reset the program environment"
+  [] (do (swap! progtypes (fn [_] #{}))
+         (swap! progconsts (fn [_] {}))
+         (swap! progpreds (fn [_] {}))))

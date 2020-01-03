@@ -5,9 +5,11 @@
 
 (defn start
   "Reset the program environment (useful for REPLS)"
-  [] (swap! syn/progpreds (fn [_] {})))
+  [] (syn/start))
 
-;; Bind the syntax macros (defpred and addclause)
+;; Bind the syntax macros
+(defmacro deftype [& args] `(syn/deftype ~@args))
+(defmacro defconst [& args] `(syn/defconst ~@args))
 (defmacro defpred [& args] `(syn/defpred ~@args))
 (defmacro addclause [& args] `(syn/addclause ~@args))
 
