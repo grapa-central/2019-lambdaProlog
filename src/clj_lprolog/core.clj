@@ -15,4 +15,7 @@
 
 (defn type-check-program?
   "Type check the current program"
-  [] (typ/type-check-program? (deref syn/progpreds)))
+  [] (typ/type-check-program?
+      (deref syn/progtypes)
+      (deref syn/progconsts)
+      (deref syn/progpreds)))

@@ -42,11 +42,9 @@
   "Substitute `t` to `var` in `ty`"
   [var t ty] (cond
                (type-unif-var? ty) (if (= ty var) t ty)
-               (syn/type-var? ty) ty
-               (syn/nat-type? ty) ty
-               (syn/prop-type? ty) ty
                (syn/arrow-type? ty)
-               (cons '-> (map (fn [ty] (substitute-ty var t ty)) (rest ty)))))
+               (cons '-> (map (fn [ty] (substitute-ty var t ty)) (rest ty)))
+               :else ty))
 
 (defn apply-subst-ty
   "Apply a substitution `si` to a type `ty`"
@@ -136,9 +134,10 @@
    - The substitution needed to be applied
    - The type of the term
    - The term enriched with metadata about its type"
-  ([t] (ok> (subst-infer-term t [] 0) :as [_ si ty t _]
-            [:ok si ty t]))
-  ([t env cnt]
+  ([t] (subst-infer-term {} t))
+  ([consts t] (ok> (subst-infer-term consts t [] 0) :as [_ si ty t _]
+                   [:ok si ty t]))
+  ([consts t env cnt]
    (cond
      ;; t is a bound variable
      (syn/bound? t)
@@ -151,12 +150,17 @@
      ;; t is a primitive
      (syn/primitive? t)
      (ok> [:ok {} (get primitive-env t) t cnt])
+     ;; t is a user constant
+     (syn/user-const? t)
+     (ok> (when (not (contains? consts t)) [:ko 'user-const {:const t}])
+          (get consts t) :as ty
+          [:ok {} ty (with-meta t {:ty ty}) cnt])
 
      ;; t is a lambda-abstraction
      (syn/lambda? t)
      (ok>
       (n-fresh-tvar cnt (second t)) :as [ty1 cnt]
-      (subst-infer-term (nth t 2) (concat (reverse ty1) env) cnt)
+      (subst-infer-term consts (nth t 2) (concat (reverse ty1) env) cnt)
       :as [_ si ty2 t' cnt]
       [:ko 'type-infer-abs {:t t}]
       (map (fn [ty] (apply-subst-ty si ty)) ty1) :as ty1
@@ -169,11 +173,12 @@
      ;; t is an application
      (syn/application? t)
      (ok>
-      (subst-infer-term (first t) env cnt) :as [_ sihd thd hd' cnt]
+      (subst-infer-term consts (first t) env cnt) :as [_ sihd thd hd' cnt]
       (u/ok-reduce (fn [[l cnt] t]
-                     (ok> (subst-infer-term t env cnt) :as [_ si ty t cnt]
+                     (ok> (subst-infer-term consts t env cnt) :as [_ si ty t cnt]
                           [:ok [(cons [si ty t] l) cnt]]))
                    ['() cnt] (rest t)) :as [_ [sittl cnt]]
+      (reverse sittl) :as sittl
       (u/ok-reduce (fn [si1 [si2 _ _ _]] (compose-subst si1 si2))
                    {} sittl) :as [_ sitl]
       (map (fn [[_ ty _ _]] ty) sittl) :as ttl
@@ -191,9 +196,10 @@
 
 (defn infer-term
   "Infer the type of `t`"
-  [t] (ok>
-       (subst-infer-term t) :as [_ _ ty _]
-       [:ok ty]))
+  ([t] (infer-term {} t))
+  ([consts t]
+   (ok> (subst-infer-term consts t) :as [_ _ ty _]
+        [:ok ty])))
 
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
@@ -206,30 +212,30 @@
   [si t]
   (cond
     (syn/bound? t) t
-    (syn/free? t)
-    (vary-meta t (fn [me] {:ty (apply-subst-ty si (get me :ty))}))
-    (syn/primitive? t) t
     (syn/lambda? t)
     (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
       {:ty (apply-subst-ty si (get (meta t) :ty))})
     (syn/application? t)
     (with-meta (map (fn [t] (apply-subst-metadata si t)) t)
       {:ty (apply-subst-ty si (get (meta t) :ty))})
+    :else (vary-meta t (fn [me] {:ty (apply-subst-ty si (get me :ty))}))
     ))
 
 (defn elaborate-term
   "Elaborate a term with its type information"
-  ([t] (ok> (subst-infer-term t) :as [_ si _ t]
-            [:ok (apply-subst-metadata si t)])))
+  ([consts t]
+   (ok> (subst-infer-term consts t) :as [_ si _ t]
+        [:ok (apply-subst-metadata si t)])))
 
 (defn check-and-elaborate-term
   "Check that `t` has type `ty`,
    and returns the elaborated version according to this type"
-  [t ty] (ok> (subst-infer-term t) :as [_ si ty2 t]
-              (mgu-ty ty ty2) :as [_ si2]
-              [:ko 'check-term {:t t :ty ty}]
-              (compose-subst si si2) :as [_ si]
-              [:ok (apply-subst-metadata si t)]))
+  [consts t ty]
+  (ok> (subst-infer-term consts t) :as [_ si ty2 t]
+       (mgu-ty ty ty2) :as [_ si2]
+       [:ko 'check-term {:t t :ty ty}]
+       (compose-subst si si2) :as [_ si]
+       [:ok (apply-subst-metadata si t)]))
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
@@ -255,7 +261,7 @@
 (defn elaborate-pred
   "Elaborate terms of an applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
-  [p prog]
+  [consts prog p]
   (ok> (when (not (contains? prog (first p)))
          [:ko 'predicate-not-found {:pred (first p)}])
        (first (get prog (first p))) :as ty
@@ -263,18 +269,19 @@
        (when (not= res 'o)
          [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
        (u/ok-map (fn [[t ty]]
-                   (check-and-elaborate-term t ty))
-                 (zipmap (rest p) params)) :as [_ tl]
+                   (check-and-elaborate-term consts t ty))
+                 (map vector (rest p) params)) :as [_ tl]
        [:ko> 'elaborate-pred {:pred p}]
        [:ok (cons (first p) (map (fn [[x]] x) tl))]))
 
 (defn elaborate-clause
   "Elaborate terms of a clause `c`"
-  [c prog] (ok> (elaborate-pred (first c) prog) :as [_ hd]
-                [:ko> 'elaborate-clause {:c c}]
-                (u/ok-map (fn [t] (elaborate-pred t prog)) (second c)) :as [_ tl]
-                [:ko> 'elaborate-clause {:c c}]
-                [:ok [hd (map (fn [[t]] t) tl)]]))
+  [consts prog c]
+  (ok> (elaborate-pred consts prog (first c)) :as [_ hd]
+       [:ko> 'elaborate-clause {:c c}]
+       (u/ok-map (fn [t] (elaborate-pred consts prog t)) (second c)) :as [_ tl]
+       [:ko> 'elaborate-clause {:c c}]
+       [:ok [hd (map (fn [[t]] t) tl)]]))
 
 (defn get-freevar-types
   "Get the types of free variables in `t`"
@@ -290,13 +297,13 @@
 (defn check-freevar-pred
   "Check and get freevar types for an elaborated applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
-  [t prog]
+  [prog t]
   (ok> (when (not (contains? prog (first t)))
          [:ko 'predicate-not-found {:pred (first t)}])
        (first (get prog (first t))) :as ty
        (syn/destruct-arrow ty (count (rest t))) :as [params res]
        (when (not= res 'o)
-         [:ko 'wrong-ret-type-for-predicate {:pred (first t) :ret-ty res}])
+         [:ko 'wrong-ret-type-for-predicate {:pred t :ret-ty res}])
        (u/ok-reduce (fn [e1 [t ty]] (ok> (get-freevar-types t) :as [_ e2]
                                         (combine-env e1 e2)))
         {} (zipmap (rest t) params))
@@ -306,57 +313,89 @@
 (defn elaborate-and-freevar-pred
   "Elaborate an applied predicate `t`, and get its freevar types,
    while checking everything"
-  [t prog] (ok> (elaborate-pred t prog) :as [_ t]
-                (check-freevar-pred t prog) :as [_ vars]
-                [:ok t vars]))
+  [consts prog t]
+  (ok> (elaborate-pred consts prog t) :as [_ t]
+       (check-freevar-pred prog t) :as [_ vars]
+       [:ok t vars]))
 
 (example
- (elaborate-and-freevar-pred '(even (S N)) {'even ['(-> i o)]}) =>
- [:ok '(even (S N)) {'N 'i}])
+ (elaborate-and-freevar-pred {} {'even ['(-> i o)]} '(even (S N)))
+ => [:ok '(even (S N)) {'N 'i}])
 
 (defn check-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
-  [c prog]
-  (ok> (check-freevar-pred (first c) prog) :as [_ fvt]
+  [prog c]
+  (ok> (check-freevar-pred prog (first c)) :as [_ fvt]
        [:ko> 'check-freevar-clause {:c c}]
-       (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred t prog) :as [_ e2]
+       (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred prog t) :as [_ e2]
                                    (combine-env e1 e2)))
                     fvt (second c))
-       [:ko> 'check-freevar-clause {:c c}]
-       ))
+       [:ko> 'check-freevar-clause {:c c}]))
 
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
-  [c prog] (ok> (elaborate-clause c prog) :as [_ c]
-                (check-freevar-clause c prog) :as [_ vars]
+  [consts prog c] (ok> (elaborate-clause consts prog c) :as [_ c]
+                (check-freevar-clause prog c) :as [_ vars]
                 [:ok c vars]))
 
 (example
- (elaborate-and-freevar-clause ['(even (S (S N))) '((even N))]
-                               {'even ['(-> i o)]}) =>
+ (elaborate-and-freevar-clause {} {'even ['(-> i o)]}
+                               ['(even (S (S N))) '((even N))]) =>
  [:ok ['(even (S (S N))) '((even N))] {'N 'i}])
 
 (defn elaborate-program
   "Elaborate the whole program `prog`"
-  [prog]
+  [consts prog]
    (ok> (u/ok-map
     (fn [[pred [ty clauses]]]
-      (ok> (u/ok-map (fn [c] (elaborate-clause c prog)) clauses) :as [_ clauses]
+      (ok> (u/ok-map (fn [c] (elaborate-clause consts prog c))
+                     clauses) :as [_ clauses]
            [:ok [pred [ty (u/map-of-pair-list (map (fn [[t]] t) clauses))]]]))
     prog) :as [_ prog]
         [:ok (u/map-of-pair-list (map (fn [[c]] c) prog))]))
 
+(defn valid-type?
+  "Check that `ty` is built from primitive and user-defined types"
+  [types ty] (cond
+               (syn/nat-type? ty) :ok
+               (syn/prop-type? ty) :ok
+               (syn/user-type? ty)
+               (if (contains? types ty) :ok [:ko 'check-type {:ty ty}])
+               (syn/arrow-type? ty)
+               (u/every-ok? (fn [ty] (valid-type? types ty)) (rest ty))))
+
+(example (valid-type? '#{bool} '(-> i bool)) => :ok)
+
+(defn check-consts
+  "Check that all `consts` use types declared in `types`"
+  [types consts] (u/every-ok?
+                  (fn [[c ty]] (ok> (valid-type? types ty) :as _
+                                   [:ko> 'check-consts {:const c :ty ty}]))
+                  consts))
+
+(defn check-preds
+  "Check that all preds in `prog` use types declared in `types`"
+  [types prog]
+  (u/every-ok?
+   (fn [[p [ty _]]] (ok> (valid-type? types ty) :as _
+                        [:ko> 'check-preds {:pred p :ty ty}]
+                        (when (not (syn/prop-type? (syn/return-type ty)))
+                          [:ko 'check-preds {:pred p :ty ty}])
+                        :ok)) prog))
+
 (defn elaborate-and-check-program
-  "Elaborate `prog`, and check that the use of freevars is coherent"
-  [prog]
-  (ok> (elaborate-program prog) :as [_ prog]
+  "Check and elaborate `prog`, and check that the use of freevars is coherent"
+  [types consts prog]
+  (ok> (check-consts types consts) :as _
+       (check-preds types prog) :as _
+       (elaborate-program consts prog) :as [_ prog]
        (u/every-ok?
         (fn [[_ [_ clauses]]]
-          (u/every-ok? (fn [c] (check-freevar-clause c prog))
+          (u/every-ok? (fn [c] (check-freevar-clause prog c))
                   clauses)) prog)
          [:ok prog]))
 
 (defn type-check-program?
   "Returns true if the program is correctly typed, false otherwise"
-  [prog] (ok> (elaborate-and-check-program prog)
-              :ok))
+  [types consts prog]
+  (ok> (elaborate-and-check-program types consts prog) :ok))

@@ -117,6 +117,14 @@
                  [head (if (> (count body) 1)
                          (cons '-> body) (first body))]))))
 
+(defn param-types
+  "Get the parameter types of `ty` if it is an arrow type, and empty list if not"
+  [ty] (if (arrow-type? ty) (take (- (count ty) 2) (rest ty)) '()))
+
+(defn return-type
+  "Get the return type of `ty` if it is an arrow type, and simply `ty` if not"
+  [ty] (if (arrow-type? ty) (last ty) ty))
+
 (defn flatten-arrow
   "Flatten an arrow type `ty` by right associativity"
   [ty] (if (arrow-type? ty)
