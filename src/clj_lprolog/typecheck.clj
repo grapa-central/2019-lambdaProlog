@@ -137,6 +137,8 @@
   ([t] (subst-infer-term {} t))
   ([consts t] (ok> (subst-infer-term consts t [] 0) :as [_ si ty t _]
                    [:ok si ty t]))
+  ([consts t cnt] (ok> (subst-infer-term consts t [] cnt) :as [_ si ty t cnt]
+                       [:ok si ty t cnt]))
   ([consts t env cnt]
    (cond
      ;; t is a bound variable
@@ -230,12 +232,15 @@
 (defn check-and-elaborate-term
   "Check that `t` has type `ty`,
    and returns the elaborated version according to this type"
-  [consts t ty]
-  (ok> (subst-infer-term consts t) :as [_ si ty2 t]
-       (mgu-ty ty ty2) :as [_ si2]
-       [:ko 'check-term {:t t :ty ty}]
-       (compose-subst si si2) :as [_ si]
-       [:ok (apply-subst-metadata si t)]))
+  ([consts t ty]
+   (ok> (check-and-elaborate-term consts t ty 0) :as [_ t _]
+        [:ok t]))
+  ([consts t ty cnt]
+   (ok> (subst-infer-term consts t cnt) :as [_ si ty2 t _]
+        (mgu-ty ty ty2) :as [_ si2]
+        [:ko 'check-term {:t t :ty ty}]
+        (compose-subst si si2) :as [_ si]
+        [:ok (apply-subst-metadata si t)])))
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
@@ -272,15 +277,14 @@
      ;; The head is a free variable
      (syn/free? (first p))
      (cons '-> (concat
-                (first (n-fresh-tvar (+ 1000 (rand-int 1000)) ;; Yeah yeah...
-                                     (count (rest p))))
+                (first (n-fresh-tvar 0 (count (rest p))))
                 '(o)))
      :else [:ko 'invalid-pred {:pred (first p)}]) :as ty
    (syn/destruct-arrow ty (count (rest p))) :as [params res]
    (when (not= res 'o)
      [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
    (u/ok-map (fn [[t ty]]
-               (check-and-elaborate-term consts t ty))
+               (check-and-elaborate-term consts t ty (inc (count (rest p)))))
              (map vector (rest p) params)) :as [_ tl]
    [:ko> 'elaborate-pred {:pred p}]
    [:ok (cons (with-meta (first p) {:ty ty}) (map (fn [[x]] x) tl))]))
