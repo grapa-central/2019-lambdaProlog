@@ -1,4 +1,4 @@
-(ns clj-lprolog.oddeven
+(ns clj-lprolog.nat
   (:require [clj-lprolog.core :as lp]))
 
 (lp/start)
