@@ -93,14 +93,14 @@
   (t/testing "positive"
     (t/is (syn/pred? 'even)))
   (t/testing "negative"
-    (t/is (not (syn/pred? 'Even)))))
+    (t/is (not (syn/pred? '())))))
 
 (t/deftest applied-pred?-test
   (t/testing "positive"
     (t/is (syn/applied-pred? '(even O)))
     (t/is (syn/applied-pred? '(p A))))
   (t/testing "negative"
-    (t/is (not (syn/applied-pred? '(Even O))))))
+    (t/is (not (syn/applied-pred? '(() O))))))
 
 (t/deftest clause-body?-test
   (t/testing "positive"

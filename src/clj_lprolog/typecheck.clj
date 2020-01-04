@@ -262,17 +262,28 @@
   "Elaborate terms of an applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
   [consts prog p]
-  (ok> (when (not (contains? prog (first p)))
-         [:ko 'predicate-not-found {:pred (first p)}])
-       (first (get prog (first p))) :as ty
-       (syn/destruct-arrow ty (count (rest p))) :as [params res]
-       (when (not= res 'o)
-         [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
-       (u/ok-map (fn [[t ty]]
-                   (check-and-elaborate-term consts t ty))
-                 (map vector (rest p) params)) :as [_ tl]
-       [:ko> 'elaborate-pred {:pred p}]
-       [:ok (cons (first p) (map (fn [[x]] x) tl))]))
+  (ok>
+   (cond
+     ;; The head is a user-defined predicate
+     (syn/user-const? (first p))
+     (if (contains? prog (first p))
+       (first (get prog (first p)))
+       [:ko 'predicate-not-found {:pred (first p)}])
+     ;; The head is a free variable
+     (syn/free? (first p))
+     (cons '-> (concat
+                (first (n-fresh-tvar (+ 1000 (rand-int 1000)) ;; Yeah yeah...
+                                     (count (rest p))))
+                '(o)))
+     :else [:ko 'invalid-pred {:pred (first p)}]) :as ty
+   (syn/destruct-arrow ty (count (rest p))) :as [params res]
+   (when (not= res 'o)
+     [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
+   (u/ok-map (fn [[t ty]]
+               (check-and-elaborate-term consts t ty))
+             (map vector (rest p) params)) :as [_ tl]
+   [:ko> 'elaborate-pred {:pred p}]
+   [:ok (cons (with-meta (first p) {:ty ty}) (map (fn [[x]] x) tl))]))
 
 (defn elaborate-clause
   "Elaborate terms of a clause `c`"
@@ -298,17 +309,17 @@
   "Check and get freevar types for an elaborated applied predicate `t`.
    The head of the predicate must appear in the program `prog`"
   [prog t]
-  (ok> (when (not (contains? prog (first t)))
-         [:ko 'predicate-not-found {:pred (first t)}])
-       (first (get prog (first t))) :as ty
-       (syn/destruct-arrow ty (count (rest t))) :as [params res]
-       (when (not= res 'o)
-         [:ko 'wrong-ret-type-for-predicate {:pred t :ret-ty res}])
-       (u/ok-reduce (fn [e1 [t ty]] (ok> (get-freevar-types t) :as [_ e2]
-                                        (combine-env e1 e2)))
-        {} (zipmap (rest t) params))
-       [:ko> 'check-freevar-pred {:p t}]
-       ))
+  (ok>
+   (get (meta (first t)) :ty) :as ty
+   (syn/destruct-arrow ty (count (rest t))) :as [params res]
+   (when (not= res 'o)
+     [:ko 'wrong-ret-type-for-predicate {:pred t :ret-ty res}])
+   (u/ok-reduce (fn [e1 [t ty]] (ok> (get-freevar-types t) :as [_ e2]
+                                    (combine-env e1 e2)))
+                (if (syn/free? (first t)) {(first t) ty} {})
+                (zipmap (rest t) params))
+   [:ko> 'check-freevar-pred {:p t}]
+   ))
 
 (defn elaborate-and-freevar-pred
   "Elaborate an applied predicate `t`, and get its freevar types,

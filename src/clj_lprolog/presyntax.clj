@@ -171,8 +171,8 @@
 ;;}
 
 (defn pred?
-  "Is `t` a predicate ?"
-  [t] (and (symbol? t) (not= (symbol (str/capitalize t)) t)))
+  "Is `t` a predicate (either defined or free variable) ?"
+  [t] (symbol? t))
 
 (example (pred? 'even) => true)
 

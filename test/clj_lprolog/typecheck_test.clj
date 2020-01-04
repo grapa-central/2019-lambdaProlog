@@ -80,7 +80,7 @@
 (t/deftest check-pred-test
   (t/testing "even"
     (do
-      (swap! syn/progpreds (fn [_] {}))
+      (syn/start)
       (syn/defpred 'even '(-> i o))
       (t/is (= {'A 'i}
                (nth
@@ -88,7 +88,7 @@
                  {} (deref syn/progpreds) '(even A)) 2)))))
   (t/testing "predicate"
     (do
-      (swap! syn/progpreds (fn [_] {}))
+      (syn/start)
       (syn/defpred 'pred '(-> (-> i o) i o))
       (t/is (= {'F 'o}
                (nth
@@ -96,14 +96,14 @@
                  {} (deref syn/progpreds) '(pred (λ 1 F) (S O))) 2)))))
   (t/testing "predicate fail"
     (do
-      (swap! syn/progpreds (fn [_] {}))
+      (syn/start)
       (syn/defpred 'pred '(-> (-> i o) i o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-pred
               {} (deref syn/progpreds) '(pred (λ 1 F) F))))))
   (t/testing "used twice"
     (do
-      (swap! syn/progpreds (fn [_] {}))
+      (syn/start)
       (syn/defpred 'twice '(-> i i o))
       (t/is (u/ok-expr?
              (typ/elaborate-and-freevar-pred
@@ -112,16 +112,24 @@
 (t/deftest check-clause-test
   (t/testing "oddeven"
     (do
-      (swap! syn/progpreds (fn [_] {}))
+      (syn/start)
       (syn/defpred 'even '(-> i o))
       (syn/defpred 'odd '(-> i o))
       (t/is (= {'N 'i}
                (nth
                 (typ/elaborate-and-freevar-clause
                  {} (deref syn/progpreds) '((even (S N)) ((odd N)))) 2)))))
+  (t/testing "pred"
+    (do
+      (syn/start)
+      (syn/defpred 'applypred '(-> (-> i o) i o))
+      (t/is (= {'P '(-> i o) 'N 'i}
+               (nth
+                (typ/elaborate-and-freevar-clause
+                 {} (deref syn/progpreds) '((applypred P N) ((P N)))) 2)))))
   (t/testing "incoherent"
     (do
-      (swap! syn/progpreds (fn [_] {}))
+      (syn/start)
       (syn/defpred 'even '(-> i o))
       (syn/defpred 'odd '(-> o o))
       (t/is (u/ko-expr?

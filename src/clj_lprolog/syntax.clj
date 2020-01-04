@@ -109,9 +109,13 @@
  (arrow-type? '(-> i o)) => true
  (arrow-type? '(-> ty1 ty2 ty1)) => true)
 
+(defn flatten-one-arrow
+  "Eliminate the '->' of an arrow `ty` if it is of length 1"
+  [ty] (if (= (count ty) 2) (second ty) ty))
+
 (defn destruct-arrow
   "Get the `n` first parameter of an arrow type `ty`"
-  [ty n] (if (= n 0) ['() ty]
+  [ty n] (if (= n 0) ['() (flatten-one-arrow ty)]
              (if (arrow-type? ty)
                (let [head (take n (rest ty)) body (nthrest ty (inc n))]
                  [head (if (> (count body) 1)
