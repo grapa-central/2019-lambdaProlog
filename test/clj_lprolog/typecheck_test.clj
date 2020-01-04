@@ -5,27 +5,27 @@
             [clojure.test :as t]))
 
 (t/deftest substitute-ty-test
-  (t/is (= 'S (typ/substitute-ty 'ty1 'S 'ty1)))
-  (t/is (= '(-> ty2 S o) (typ/substitute-ty 'ty1 'S '(-> ty2 ty1 o)))))
+  (t/is (= 's (typ/substitute-ty 'Ty1 's 'Ty1)))
+  (t/is (= '(-> Ty2 s o) (typ/substitute-ty 'Ty1 's '(-> Ty2 Ty1 o)))))
 
 (t/deftest apply-subst-ty-test
-  (t/is (= '(-> X Y) (typ/apply-subst-ty {'ty1 'X 'ty2 'Y} '(-> ty1 ty2))))
-  (t/is (= '(-> X ty2) (typ/apply-subst-ty {'ty1 'ty3 'ty3 'X} '(-> ty1 ty2)))))
+  (t/is (= '(-> x y) (typ/apply-subst-ty {'Ty1 'x 'Ty2 'y} '(-> Ty1 Ty2))))
+  (t/is (= '(-> x Ty2) (typ/apply-subst-ty {'Ty1 'Ty3 'Ty3 'x} '(-> Ty1 Ty2)))))
 
 (t/deftest mgu-ty-test
   (t/testing "positive"
-    (t/is (= [:ok {'ty1 'A}] (typ/mgu-ty 'ty1 'A)))
-    (t/is (= [:ok {'ty1 'A 'ty2 'A}]
-             (typ/mgu-ty '(-> ty1 (-> ty1 ty2)) '(-> ty1 (-> A A)))))
-    (t/is (= [:ok {'ty1 'A 'ty2 'A}]
-             (typ/mgu-ty '(-> ty1 (-> ty1 ty2)) '(-> A (-> ty1 A)))))
-    (t/is (= [:ok {'ty1 'A 'ty2 '(-> B C)}]
-             (typ/mgu-ty '(-> A B C) '(-> ty1 ty2) ))))
+    (t/is (= [:ok {'Ty1 'a}] (typ/mgu-ty 'Ty1 'a)))
+    (t/is (= [:ok {'Ty1 'a 'Ty2 'a}]
+             (typ/mgu-ty '(-> Ty1 (-> Ty1 Ty2)) '(-> Ty1 (-> a a)))))
+    (t/is (= [:ok {'Ty1 'a 'Ty2 'a}]
+             (typ/mgu-ty '(-> Ty1 (-> Ty1 Ty2)) '(-> a (-> Ty1 a)))))
+    (t/is (= [:ok {'Ty1 'a 'Ty2 '(-> b c)}]
+             (typ/mgu-ty '(-> a b c) '(-> Ty1 Ty2) ))))
   (t/testing "negative"
-    (t/is (u/ko-expr? (typ/mgu-ty 'A 'B)))
-    (t/is (u/ko-expr? (typ/mgu-ty '(-> ty1 ty1) '(-> A B))))
-    (t/is (u/ko-expr? (typ/mgu-ty '(-> ty1 ty2 ty2) '(-> A ty1 B))))
-    (t/is (u/ko-expr? (typ/mgu-ty 'ty1 '(-> ty1 ty2))))))
+    (t/is (u/ko-expr? (typ/mgu-ty 'a 'b)))
+    (t/is (u/ko-expr? (typ/mgu-ty '(-> Ty1 Ty1) '(-> a b))))
+    (t/is (u/ko-expr? (typ/mgu-ty '(-> Ty1 Ty2 Ty2) '(-> a Ty1 b))))
+    (t/is (u/ko-expr? (typ/mgu-ty 'Ty1 '(-> Ty1 Ty2))))))
 
 (t/deftest infer-term-test
   (t/testing "positive"
@@ -46,11 +46,11 @@
 (t/deftest check-and-elaborate-term-test
   (t/testing "positive"
     (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(S (S (S O))) 'i)))
-    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 1 0) '(-> A A))))
-    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 2 1) '(-> A i A))))
-    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '((λ 2 1) O) '(-> A i)))))
+    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 1 0) '(-> a a))))
+    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '(λ 2 1) '(-> a b a))))
+    (t/is (u/ok-expr? (typ/check-and-elaborate-term {} '((λ 2 1) O) '(-> a i)))))
   (t/testing "negative"
-    (t/is (u/ko-expr? (typ/check-and-elaborate-term {} '(λ 1 0) '(-> A B))))))
+    (t/is (u/ko-expr? (typ/check-and-elaborate-term {} '(λ 1 0) '(-> a b))))))
 
 ;; Not easy to test metadata simply...
 

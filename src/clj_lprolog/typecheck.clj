@@ -3,7 +3,8 @@
   (:require [clj-lprolog.utils :as u :refer [example examples ok>]]
             [clj-lprolog.syntax :as syn]
             [clj-lprolog.presyntax :as psyn]
-            [clojure.test :as t]))
+            [clojure.test :as t]
+            [clojure.string :as str]))
 
 (def +examples-enabled+ true)
 
@@ -13,10 +14,10 @@
 ;; There is no let-binding in the language, we don't care about generalization
 ;;}
 
-(defn fresh-tvar [count] (symbol (str "ty" count)))
+(defn fresh-tvar [count] (symbol (str "Ty" count)))
 
 (example
- (fresh-tvar 42) => 'ty42)
+ (fresh-tvar 42) => 'Ty42)
 
 (defn n-fresh-tvar [count n]
   [(map first (take n (iterate (fn [[_ count]] [(fresh-tvar count) (inc count)])
@@ -24,11 +25,11 @@
    (+ count n)])
 
 (example
- (n-fresh-tvar 42 5) => ['(ty42 ty43 ty44 ty45 ty46) 47])
+ (n-fresh-tvar 42 5) => ['(Ty42 Ty43 Ty44 Ty45 Ty46) 47])
 
 (defn type-unif-var?
   "Is `t` a unification variable ?"
-  [t] (and (symbol? t) (> (count (name t)) 2) (= (subs (name t) 0 2) "ty")))
+  [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)))
 
 (defn get-unif-vars
   "Get the unification variables appearing inside `ty`"
@@ -121,8 +122,8 @@
 
 (examples
  (mgu-ty 'i 'i) => [:ok {}]
- (mgu-ty 'i 'ty1) => [:ok {'ty1 'i}]
- (mgu-ty '(-> ty1 ty2) '(-> i o)) => [:ok {'ty1 'i 'ty2 'o}])
+ (mgu-ty 'i 'Ty1) => [:ok {'Ty1 'i}]
+ (mgu-ty '(-> Ty1 Ty2) '(-> i o)) => [:ok {'Ty1 'i 'Ty2 'o}])
 
 (def primitive-env
   "Types of primitives"
@@ -205,8 +206,8 @@
 
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
- (infer-term '(λ 2 0)) => [:ok '(-> ty0 ty1 ty1)]
- (infer-term '((λ 2 1) (λ 1 0))) => [:ok '(-> ty1 (-> ty2 ty2))]
+ (infer-term '(λ 2 0)) => [:ok '(-> Ty0 Ty1 Ty1)]
+ (infer-term '((λ 2 1) (λ 1 0))) => [:ok '(-> Ty1 (-> Ty2 Ty2))]
  (infer-term '((λ 1 0) (S O))) => [:ok 'i])
 
 (defn apply-subst-metadata
@@ -260,7 +261,7 @@
 
 (examples
  (combine-env {'A 'i} {'B 'o}) => [:ok {'A 'i, 'B 'o}]
- (combine-env {'A 'i} {'A 'ty1}) => [:ok {'A 'i}]
+ (combine-env {'A 'i} {'A 'Ty1}) => [:ok {'A 'i}]
  (u/ko-expr? (combine-env {'A 'i} {'A 'o})) => :ko)
 
 (defn elaborate-pred
