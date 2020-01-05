@@ -75,8 +75,7 @@
 
 (defn type-var?
   "Is `t` a type variable ?"
-  [t] (and (symbol? t)
-           (= (symbol (str/capitalize t)) t)))
+  [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)))
 
 (example (type-var? 'A) => true)
 
@@ -108,6 +107,12 @@
 (examples
  (arrow-type? '(-> i o)) => true
  (arrow-type? '(-> ty1 ty2 ty1)) => true)
+
+(defn applied-type-constructor?
+  "Is `t` and applied constructor ?"
+  [t] (and (seq? t) (user-type? (first t)) (not (empty? (rest t)))))
+
+(example (applied-type-constructor? '(list nat)) => true)
 
 (defn flatten-one-arrow
   "Eliminate the '->' of an arrow `ty` if it is of length 1"

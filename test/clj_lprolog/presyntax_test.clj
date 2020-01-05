@@ -38,6 +38,12 @@
     (t/is (not (syn/proper-arrow-type? '(-> A))))
     (t/is (not (syn/proper-arrow-type? '(-> A ()))))))
 
+(t/deftest proper-applied-type-constructor?-test
+  (t/testing "positive"
+    (t/is (syn/proper-applied-type-constructor? '(pair nat bool))))
+  (t/testing "negative"
+    (t/is (not (syn/proper-applied-type-constructor? '(list ()))))))
+
 (t/deftest proper-type?-test
   (t/is (syn/proper-type? 'o))
   (t/is (syn/proper-type? 'i))
@@ -118,13 +124,27 @@
   (t/testing "negative"
     (t/is (not (syn/clause? '(even O)))))) ;; Parenthesis !
 
+(t/deftest user-type-dec?-test
+  (t/testing "positive"
+    (t/is (syn/user-type-dec? 'nat))
+    (t/is (syn/user-type-dec? '(list A)))
+    (t/is (syn/user-type-dec? '(pair A B))))
+  (t/testing "negative"
+    (t/is (not (syn/user-type-dec? 'A)))
+    (t/is (not (syn/user-type-dec? '(list (list A)))))
+    (t/is (not (syn/user-type-dec? '(pair a b))))))
+
 ;; Testing on macros
 
 (t/deftest deftype-test
   (t/testing "nat"
     (do (syn/start)
         (syn/deftype 'nat)
-        (t/is (= '#{nat} @syn/progtypes)))))
+        (t/is (= '#{nat} @syn/progtypes))))
+  (t/testing "list"
+    (do (syn/start)
+        (syn/deftype '(list A))
+        (t/is (= '#{(list A)} @syn/progtypes)))))
 
 (t/deftest defconst-test
   (t/testing "bool"
@@ -136,7 +156,12 @@
     (do (syn/start)
         (syn/deftype 'nat)
         (syn/defconst 'zero 'nat) (syn/defconst 'succ '(-> nat nat))
-        (t/is (= '{zero nat succ (-> nat nat)} @syn/progconsts)))))
+        (t/is (= '{zero nat succ (-> nat nat)} @syn/progconsts))))
+  (t/testing "list"
+    (do (syn/start)
+        (syn/deftype '(list A))
+        (syn/defconst 'ni '(list A))
+        (syn/defconst 'cs '(-> B (list B) (list B))))))
 
 (t/deftest defpred-test
   (t/testing "even"

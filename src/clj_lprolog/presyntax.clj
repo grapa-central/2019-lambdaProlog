@@ -58,15 +58,21 @@
   [t] (and (syn/arrow-type? t)
            (every? proper-type? (rest t))))
 
+(defn proper-applied-type-constructor?
+  "Is `t` an applied type constructor ?"
+  [t] (and (syn/applied-type-constructor? t) (every? proper-type? (rest t))))
+
 (defn proper-type?
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
           (syn/prop-type? t)
           (syn/nat-type? t)
           (syn/user-type? t)
-          (proper-arrow-type? t)))
+          (proper-arrow-type? t)
+          (proper-applied-type-constructor? t)))
 
 (example (proper-arrow-type? '(-> A (-> B C))) => true)
+(example (proper-applied-type-constructor? '(pair nat bool)) => true)
 
 ;;{
 ;; # User terms
@@ -219,11 +225,20 @@
 ;; Contains the set of user types during execution of the program
 (def progtypes (atom #{}))
 
+(defn user-type-dec?
+  "Is `ty` a well-formed type definition"
+  [ty] (or (syn/user-type? ty)
+           (and (syn/applied-type-constructor? ty) (every? syn/type-var? (rest ty)))))
+
+(examples
+ (user-type-dec? 'nat) => true
+ (user-type-dec? '(list A)) => true)
+
 (defmacro deftype
   "Define a type. `n` is the name of the type, it should be lowercase"
-  [n] `(if (syn/user-type? ~n)
-         (swap! progtypes (fn [pt#] (conj pt# ~n)))
-         [:ko 'deftype {:n ~n}]))
+  [ty] `(if (user-type-dec? ~ty)
+          (swap! progtypes (fn [pt#] (conj pt# ~ty)))
+          [:ko 'deftype {:n ~ty}]))
 
 ;; Contains the set of constants (and their types) during execution of the program
 (def progconsts (atom {}))

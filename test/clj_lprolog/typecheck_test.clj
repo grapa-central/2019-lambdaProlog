@@ -6,7 +6,8 @@
 
 (t/deftest substitute-ty-test
   (t/is (= 's (typ/substitute-ty 'Ty1 's 'Ty1)))
-  (t/is (= '(-> Ty2 s o) (typ/substitute-ty 'Ty1 's '(-> Ty2 Ty1 o)))))
+  (t/is (= '(-> Ty2 s o) (typ/substitute-ty 'Ty1 's '(-> Ty2 Ty1 o))))
+  (t/is (= '(list nat) (typ/substitute-ty 'Ty1 'nat '(list Ty1)))))
 
 (t/deftest apply-subst-ty-test
   (t/is (= '(-> x y) (typ/apply-subst-ty {'Ty1 'x 'Ty2 'y} '(-> Ty1 Ty2))))
@@ -20,12 +21,20 @@
     (t/is (= [:ok {'Ty1 'a 'Ty2 'a}]
              (typ/mgu-ty '(-> Ty1 (-> Ty1 Ty2)) '(-> a (-> Ty1 a)))))
     (t/is (= [:ok {'Ty1 'a 'Ty2 '(-> b c)}]
-             (typ/mgu-ty '(-> a b c) '(-> Ty1 Ty2) ))))
+             (typ/mgu-ty '(-> a b c) '(-> Ty1 Ty2) )))
+    (t/is (= [:ok {'Ty1 'nat}]
+             (typ/mgu-ty '(list nat) '(list Ty1)))))
   (t/testing "negative"
     (t/is (u/ko-expr? (typ/mgu-ty 'a 'b)))
     (t/is (u/ko-expr? (typ/mgu-ty '(-> Ty1 Ty1) '(-> a b))))
     (t/is (u/ko-expr? (typ/mgu-ty '(-> Ty1 Ty2 Ty2) '(-> a Ty1 b))))
-    (t/is (u/ko-expr? (typ/mgu-ty 'Ty1 '(-> Ty1 Ty2))))))
+    (t/is (u/ko-expr? (typ/mgu-ty 'Ty1 '(-> Ty1 Ty2))))
+    (t/is (u/ko-expr? (typ/mgu-ty '(pair Ty1 nat) '(pair bool Ty1))))))
+
+(t/deftest rename-type-vars-test
+  (t/is (= 'TyA42 (typ/rename-type-vars 42 'A)))
+  (t/is (= 'i (typ/rename-type-vars 18 'i)))
+  (t/is (= '(pair TyA0 TyB0) (typ/rename-type-vars 0 '(pair A B)))))
 
 (t/deftest infer-term-test
   (t/testing "positive"

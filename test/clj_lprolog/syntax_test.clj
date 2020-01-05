@@ -77,6 +77,15 @@
   (t/testing "negative"
     (t/is (not (syn/arrow-type? '(t1 t2))))))
 
+(t/deftest applied-type-constructor?-test
+  (t/testing "positive"
+    (t/is (syn/applied-type-constructor? '(list A)))
+    (t/is (syn/applied-type-constructor? '(pair bool nat)))
+    (t/is (syn/applied-type-constructor? '(-> nat o)))) ;; Yes
+  (t/testing "negative"
+    (t/is (not (syn/applied-type-constructor? 'A)))
+    (t/is (not (syn/applied-type-constructor? '(list))))))
+
 (t/deftest destruct-arrow-test
   (t/is (= ['(A) 'B] (syn/destruct-arrow '(-> A B) 1)))
   (t/is (= ['(A) '(-> B C)] (syn/destruct-arrow '(-> A B C) 1)))
