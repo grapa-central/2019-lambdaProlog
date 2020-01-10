@@ -168,7 +168,7 @@
             ;; r9
             (and (zero? ol) (zero? nl) (empty? e)) t
             ;; r1 : t is a constant
-            (syn/primitive? t) t
+            (or (syn/primitive? t) (syn/user-const? t)) t
             ;; r2 : t is an instantiatable variable
             (syn/free? t) t
             ;; r3 : i > ol and j = i - ol + nl

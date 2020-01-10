@@ -25,6 +25,7 @@
 (t/deftest rewrite-suspension-test
   (t/is (= '([t1 1 2 ()] [t2 1 2 ()])
            (nor/rewrite-suspension ['(t1 t2) 1 2 ()])))
+  (t/is (= 'succ (nor/rewrite-suspension ['succ 1 2 ()])))
   (t/is (= '(λ 2 [A 3 3 (2 1)]) (nor/rewrite-suspension ['(λ 2 A) 1 1 '()]))))
 
 ;; Tests on implicit beta-reduction
