@@ -13,11 +13,11 @@
 
 (t/deftest bound?-test
   (t/testing "positive"
-    (t/is (syn/bound? 42)))
+    (t/is (syn/bound? #{42})))
   (t/testing "negative"
     (t/is (not (syn/bound? 'A)))
     (t/is (not (syn/bound? ())))
-    (t/is (not (syn/bound? -1)))))
+    (t/is (not (syn/bound? #{-1})))))
 
 (t/deftest free?-test
   (t/testing "positive"
@@ -41,6 +41,19 @@
     (t/is (syn/user-const? 'succ)))
   (t/testing "negative"
     (t/is (not (syn/user-const? 'A)))))
+
+(t/deftest lambda?-test
+  (t/testing "positive"
+    (t/is (syn/lambda? '(λ 2 #{0}))))
+  (t/testing "negative"
+    (t/is (not (syn/lambda? '(λ [x y] #{0}))))
+    (t/is (not (syn/lambda? '(λ 2))))))
+
+(t/deftest application?-test
+  (t/testing "positive"
+    (t/is (syn/application? '(A #{0} #{1}))))
+  (t/testing "negative"
+    (t/is (not (syn/application? '())))))
 
 ;; Tests on type syntax
 

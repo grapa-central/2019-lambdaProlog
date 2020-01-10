@@ -14,6 +14,7 @@
 ;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
+;; - a suspension (used for explicit substitutions)
 ;;}
 
 (def reserved
@@ -22,9 +23,9 @@
 
 (defn bound?
   "Is `t` a bound variable ?"
-  [t] (nat-int? t))
+  [t] (and (set? t) (nat-int? (first t))))
 
-(example (bound? 1) => true)
+(example (bound? #{1}) => true)
 
 (defn free?
   "Is `t` a free variable ?"
@@ -49,7 +50,7 @@
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
-  [t] (and (seq? t)
+  [t] (and (seq? t) (= (count t) 3)
            (= (first t) 'λ)
            (nat-int? (second t))))
 
@@ -58,9 +59,24 @@
 (defn application?
   "Is `t` an application ?"
   [t] (and (seq? t)
-           (not (empty? t)) (not (empty? (rest t)))))
+           (not= (first t) 'λ)
+           (not (empty? t))))
 
 (example (application? '(S O)) => true)
+
+(defn beta-redex?
+  "Is `t` a beta-redex ?"
+  [t] (and (application? t) (>= (count t) 2)
+           (lambda? (first t))))
+
+(defn suspension?
+  "Is `t` a suspension ?"
+  [t] (and (vector? t) (= (count t) 4)
+           (nat-int? (nth t 1))
+           (nat-int? (nth t 2))
+           (seq? (nth t 3))))
+
+(example (suspension? ['(S O) 1 0 '()]) => true)
 
 ;;{
 ;; # Type syntax

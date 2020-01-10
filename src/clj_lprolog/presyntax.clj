@@ -38,8 +38,8 @@
           (proper-lambda? t)
           (proper-application? t)))
 
-(example (proper-application? '((λ 2 0) A B)) => true)
-(example (proper-lambda? '(λ 2 0)) => true)
+(example (proper-application? '((λ 2 #{0}) A B)) => true)
+(example (proper-lambda? '(λ 2 #{0})) => true)
 
 ;;{
 ;; # Type syntax
@@ -93,36 +93,21 @@
 
 (example (bound-or-const? 'x) => true)
 
-(defn free?
-  "Is `t` a free variable ?"
-  [t] (and (symbol? t)
-           (not (some #{t} syn/reserved))
-           (= (symbol (str/capitalize t)) t)))
-
-(example (free? 'X) => true)
-
 (defn lambda?
   "Is `t` a λ-abstraction ?"
-  [t] (and (seq? t)
+  [t] (and (seq? t) (= (count t) 3)
            (= (first t) 'λ)
            (vector? (second t)) (every? bound-or-const? (second t))))
 
 (example (lambda? '(λ [x y] (+ x y))) => true)
 
-(defn application?
-  "Is `t` an application ?"
-  [t] (and (seq? t)
-           (not (empty? t)) (not (empty? (rest t)))))
-
-(example (application? '(A B)) => true)
-
 (defn user-term?
   "Is `t` a user term ?"
   [t] (or (bound-or-const? t)
-          (free? t)
+          (syn/free? t)
           (syn/primitive? t)
           (lambda? t)
-          (application? t)))
+          (syn/application? t)))
 
 (defn parse-aux
   "Parse a user term `t` to a kernel term using a naming environment"
@@ -130,11 +115,11 @@
   (cond (bound-or-const? t)
         (if (contains? (first env) t)
           ;; t is really a bound variable
-          [:ok (get (first env) t)]
+          [:ok #{(get (first env) t)}]
           ;; t is actually a use constant
           [:ok t])
 
-        (free? t) [:ok t]
+        (syn/free? t) [:ok t]
 
         (syn/primitive? t) [:ok t]
 
@@ -148,7 +133,7 @@
                       env (second t))) :as [_ t']
         [:ok (list 'λ (count (second t)) t')])
 
-        (application? t)
+        (syn/application? t)
         (ok> (u/ok-map (fn [t] (parse-aux t env)) t) :as [_ t']
              [:ok (map (fn [[t]] t) t')])
 

@@ -61,10 +61,15 @@
                            (not (or (type-unif-var? y1)
                                     (type-unif-var? y2))))))) s1))
 
+(defn apply-subst-subst
+  "Apply `s1` to every value of `s2`"
+  [s1 s2] (u/map-of-pair-list
+           (map (fn [[k ty]] [k (apply-subst-ty s1 ty)]) s2)))
+
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
   [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
-               [:ok (conj s1 s2)]))
+               [:ok (conj s1 (apply-subst-subst s1 s2))]))
 
 (examples
  (compose-subst {'ty1 'i} {'ty2 'o}) =>
@@ -159,14 +164,20 @@
      ;; t is a bound variable
      (syn/bound? t)
      (ok>
-      (when (>= t (count env)) [:ko> 'outside-env {:n t :env env}])
-      [:ok {} (nth env t) t cnt])
+      (when (>= (first t) (count env))
+        [:ko> 'outside-env {:n (first t) :env env}])
+      (nth env (first t)) :as ty
+      [:ok {} ty (with-meta t {:ty ty}) cnt])
+
      ;; t is a free variable
      (syn/free? t) (let [ty (fresh-tvar cnt)]
                      [:ok {} ty (with-meta t {:ty ty}) (inc cnt)])
+
      ;; t is a primitive
      (syn/primitive? t)
-     (ok> [:ok {} (get primitive-env t) t cnt])
+     (ok> (get primitive-env t) :as ty
+          [:ok {} ty (with-meta t {:ty ty}) cnt])
+
      ;; t is a user constant
      (syn/user-const? t)
      (ok> (when (not (contains? consts t)) [:ko 'user-const {:const t}])
@@ -208,8 +219,7 @@
       [:ko 'type-infer-app {:t t}]
       (compose-subst si sihdtl) :as [_ si']
       [:ko 'type-infer-app {:t t}]
-      [:ok si' ty (with-meta (cons hd' tl') {:ty ty}) (inc cnt)]
-      ))))
+      [:ok si' ty (with-meta (cons hd' tl') {:ty ty}) (inc cnt)]))))
 
 (defn infer-term
   "Infer the type of `t`"
@@ -220,15 +230,14 @@
 
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
- (infer-term '(λ 2 0)) => [:ok '(-> Ty0 Ty1 Ty1)]
- (infer-term '((λ 2 1) (λ 1 0))) => [:ok '(-> Ty1 (-> Ty2 Ty2))]
- (infer-term '((λ 1 0) (S O))) => [:ok 'i])
+ (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty1)]
+ (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 (-> Ty2 Ty2))]
+ (infer-term '((λ 1 #{0}) (S O))) => [:ok 'i])
 
 (defn apply-subst-metadata
   "Apply a substitution `si` in the metadata of `t`"
   [si t]
   (cond
-    (syn/bound? t) t
     (syn/lambda? t)
     (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
       {:ty (apply-subst-ty si (get (meta t) :ty))})
@@ -256,6 +265,17 @@
         [:ko 'check-term {:t t :ty ty}]
         (compose-subst si si2) :as [_ si]
         [:ok (apply-subst-metadata si t) cnt])))
+
+(defn type-of
+  "Retrieve type information for an elaborated term `t`"
+  [t] (cond
+        (syn/bound? t) (get (meta t) :ty)
+        (syn/free? t) (get (meta t) :ty)
+        (syn/primitive? t) (get (meta t) :ty)
+        (syn/application? t) (get (meta t) :ty)
+        (syn/lambda? t) (get (meta t) :ty)
+        (syn/suspension? t) (type-of (first t))))
+
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
