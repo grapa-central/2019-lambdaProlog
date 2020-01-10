@@ -83,7 +83,9 @@
   [ty1 ty2]
   ((fn aux [tys si]
      (if (empty? tys) [:ok si]
-         (let [[ty1 ty2] (first tys)]
+         (let [[ty1 ty2] (first tys)
+               ty1 (syn/normalize-ty ty1)
+               ty2 (syn/normalize-ty ty2)]
            (cond
              ;; The two types are the same
              (= ty1 ty2) (recur (rest tys) si)
@@ -111,9 +113,7 @@
              ;; ty1 and ty2 are arrow types or applied constructors
              (and (syn/applied-type-constructor? ty1) (syn/applied-type-constructor? ty2)
                   (= (first ty1) (first ty2)))
-             (let [ty1 (syn/flatten-arrow ty1)
-                   ty2 (syn/flatten-arrow ty2)
-                   [ty1 ty2]
+             (let [[ty1 ty2]
                    (cond
                      (< (count ty1) (count ty2))
                      [ty1 (syn/curry-arrow ty2 (- (count ty2) (count ty1)))]
@@ -231,7 +231,7 @@
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
  (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty1)]
- (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 (-> Ty2 Ty2))]
+ (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 Ty2 Ty2)]
  (infer-term '((λ 1 #{0}) (S O))) => [:ok 'i])
 
 (defn apply-subst-metadata
@@ -240,11 +240,12 @@
   (cond
     (syn/lambda? t)
     (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
-      {:ty (apply-subst-ty si (get (meta t) :ty))})
+      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
     (syn/application? t)
     (with-meta (map (fn [t] (apply-subst-metadata si t)) t)
-      {:ty (apply-subst-ty si (get (meta t) :ty))})
-    :else (vary-meta t (fn [me] {:ty (apply-subst-ty si (get me :ty))}))
+      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
+    :else (vary-meta t (fn [me] {:ty (syn/normalize-ty
+                                     (apply-subst-ty si (get me :ty)))}))
     ))
 
 (defn elaborate-term
@@ -268,14 +269,7 @@
 
 (defn type-of
   "Retrieve type information for an elaborated term `t`"
-  [t] (cond
-        (syn/bound? t) (get (meta t) :ty)
-        (syn/free? t) (get (meta t) :ty)
-        (syn/primitive? t) (get (meta t) :ty)
-        (syn/application? t) (get (meta t) :ty)
-        (syn/lambda? t) (get (meta t) :ty)
-        (syn/suspension? t) (type-of (first t))))
-
+  [t] (get (meta t) :ty))
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"

@@ -34,7 +34,6 @@
     (t/is (syn/proper-arrow-type? '(-> (-> A B) A B))))
   (t/testing "negative"
     (t/is (not (syn/proper-arrow-type? 'A)))
-    (t/is (not (syn/proper-arrow-type? '(-> A))))
     (t/is (not (syn/proper-arrow-type? '(-> A ()))))))
 
 (t/deftest proper-applied-type-constructor?-test

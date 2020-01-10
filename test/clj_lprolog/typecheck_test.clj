@@ -22,6 +22,7 @@
              (typ/mgu-ty '(-> Ty1 (-> Ty1 Ty2)) '(-> a (-> Ty1 a)))))
     (t/is (= [:ok {'Ty1 'a 'Ty2 '(-> b c)}]
              (typ/mgu-ty '(-> a b c) '(-> Ty1 Ty2) )))
+    (t/is (= [:ok {'Ty1 'a}] (typ/mgu-ty 'a '(-> Ty1))))
     (t/is (= [:ok {'Ty1 'nat}]
              (typ/mgu-ty '(list nat) '(list Ty1)))))
   (t/testing "negative"
