@@ -437,7 +437,7 @@
                        clauses)) prog)
        [:ok prog]))
 
-(defn type-check-program?
+(defn type-check-program
   "Returns true if the program is correctly typed, false otherwise"
   [types consts prog]
   (ok> (elaborate-and-check-program types consts prog) :ok))

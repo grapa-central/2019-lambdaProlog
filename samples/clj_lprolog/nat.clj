@@ -19,4 +19,4 @@
 ;; And only one for odd, using even
 (lp/addclause '((odd (succ N)) :- (even N)))
 
-(lp/type-check-program?)
+(lp/type-check-program)

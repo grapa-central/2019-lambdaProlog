@@ -13,9 +13,9 @@
 (defmacro defpred [& args] `(syn/defpred ~@args))
 (defmacro addclause [& args] `(syn/addclause ~@args))
 
-(defn type-check-program?
+(defn type-check-program
   "Type check the current program"
-  [] (typ/type-check-program?
+  [] (typ/type-check-program
       (deref syn/progtypes)
       (deref syn/progconsts)
       (deref syn/progpreds)))

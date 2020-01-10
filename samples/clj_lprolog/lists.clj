@@ -26,4 +26,4 @@
 (lp/addclause '((reverse ni ni)))
 (lp/addclause '((reverse (cs X L1) L2) :- (reverse L1 L3), (append L3 (cs X ni) L2)))
 
-(lp/type-check-program?)
+(lp/type-check-program)
