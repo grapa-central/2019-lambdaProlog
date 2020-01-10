@@ -35,6 +35,13 @@
     (t/is (not (syn/primitive? '∀)))
     (t/is (not (syn/primitive? 'λ)))))
 
+(t/deftest user-const?-test
+  (t/testing "positive"
+    (t/is (syn/user-const? 'zero))
+    (t/is (syn/user-const? 'succ)))
+  (t/testing "negative"
+    (t/is (not (syn/user-const? 'A)))))
+
 ;; Tests on type syntax
 
 (t/deftest type-var?-test
@@ -57,6 +64,27 @@
   (t/testing "negative"
     (t/is (not (syn/prop-type? 'O)))
     (t/is (not (syn/prop-type? '())))))
+
+(t/deftest user-type?-test
+  (t/testing "positive"
+    (t/is (syn/user-type? 'bool)))
+  (t/testing "negative"
+    (t/is (not (syn/user-type? 'Bool)))))
+
+(t/deftest arrow-type?-test
+  (t/testing "positive"
+    (t/is (syn/arrow-type? '(-> t1 t2))))
+  (t/testing "negative"
+    (t/is (not (syn/arrow-type? '(t1 t2))))))
+
+(t/deftest applied-type-constructor?-test
+  (t/testing "positive"
+    (t/is (syn/applied-type-constructor? '(list A)))
+    (t/is (syn/applied-type-constructor? '(pair bool nat)))
+    (t/is (syn/applied-type-constructor? '(-> nat o)))) ;; Yes
+  (t/testing "negative"
+    (t/is (not (syn/applied-type-constructor? 'A)))
+    (t/is (not (syn/applied-type-constructor? '(list))))))
 
 (t/deftest destruct-arrow-test
   (t/is (= ['(A) 'B] (syn/destruct-arrow '(-> A B) 1)))

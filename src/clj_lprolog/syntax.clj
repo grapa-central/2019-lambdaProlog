@@ -11,7 +11,7 @@
 ;; A kernel lambda-term is either:
 ;; - a bound variable (identified by its De Bruijn index)
 ;; - a free (substituable) variable (identified by a symbol)
-;; - a primitive constant (∀, =>, O, S, +, *)
+;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
 ;;}
@@ -28,7 +28,8 @@
 
 (defn free?
   "Is `t` a free variable ?"
-  [t] (and (symbol? t) (not (some #{t} reserved))))
+  [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)
+           (not (some #{t} reserved))))
 
 (example (free? 'A) => true)
 
@@ -39,6 +40,12 @@
 (examples
  (primitive? 'S) => true
  (primitive? '+) => true)
+
+(defn user-const?
+  "Is `t` a user constant ?"
+  [t] (and (symbol? t) (= (symbol (str/lower-case t)) t)))
+
+(example (user-const? 'zero) => true)
 
 (defn lambda?
   "Is `t` a λ-abstraction ?"
@@ -62,13 +69,13 @@
 ;; - a type variable (identified by an capitalized symbol)
 ;; - the primitive "nat" type `i`
 ;; - the primitive "prop" type `o`
+;; - a user type
 ;; - a n-ary arrow type
 ;;}
 
 (defn type-var?
   "Is `t` a type variable ?"
-  [t] (and (symbol? t)
-           (= (symbol (str/capitalize t)) t)))
+  [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)))
 
 (example (type-var? 'A) => true)
 
@@ -84,6 +91,13 @@
 
 (example (prop-type? 'o) => true)
 
+(defn user-type?
+  "Is `t` a user type ?"
+  [t] (and (symbol? t)
+           (= (symbol (str/lower-case t)) t)))
+
+(example (user-type? 'nat) => true)
+
 (defn arrow-type?
   "Is `t` an arrow type ?"
   [t] (and (seq? t)
@@ -94,13 +108,31 @@
  (arrow-type? '(-> i o)) => true
  (arrow-type? '(-> ty1 ty2 ty1)) => true)
 
+(defn applied-type-constructor?
+  "Is `t` and applied constructor ?"
+  [t] (and (seq? t) (user-type? (first t)) (not (empty? (rest t)))))
+
+(example (applied-type-constructor? '(list nat)) => true)
+
+(defn flatten-one-arrow
+  "Eliminate the '->' of an arrow `ty` if it is of length 1"
+  [ty] (if (= (count ty) 2) (second ty) ty))
+
 (defn destruct-arrow
   "Get the `n` first parameter of an arrow type `ty`"
-  [ty n] (if (= n 0) ['() ty]
+  [ty n] (if (= n 0) ['() (flatten-one-arrow ty)]
              (if (arrow-type? ty)
                (let [head (take n (rest ty)) body (nthrest ty (inc n))]
                  [head (if (> (count body) 1)
                          (cons '-> body) (first body))]))))
+
+(defn param-types
+  "Get the parameter types of `ty` if it is an arrow type, and empty list if not"
+  [ty] (if (arrow-type? ty) (take (- (count ty) 2) (rest ty)) '()))
+
+(defn return-type
+  "Get the return type of `ty` if it is an arrow type, and simply `ty` if not"
+  [ty] (if (arrow-type? ty) (last ty) ty))
 
 (defn flatten-arrow
   "Flatten an arrow type `ty` by right associativity"
