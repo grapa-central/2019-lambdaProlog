@@ -84,8 +84,8 @@
   ((fn aux [tys si]
      (if (empty? tys) [:ok si]
          (let [[ty1 ty2] (first tys)
-               ty1 (syn/normalize-ty ty1)
-               ty2 (syn/normalize-ty ty2)]
+               ty1 (syn/normalize-ty (apply-subst-ty si ty1))
+               ty2 (syn/normalize-ty (apply-subst-ty si ty2))]
            (cond
              ;; The two types are the same
              (= ty1 ty2) (recur (rest tys) si)
@@ -96,9 +96,7 @@
               (when (some #{ty1} (get-unif-vars ty2))
                 [:ko 'occur-check {:ty1 ty1 :ty2 ty2}])
               (compose-subst si {ty1 ty2}) :as [_ si]
-              (aux (map (fn [[x y]]
-                          [(apply-subst-ty si x) (apply-subst-ty si y)])
-                        (rest tys)) si))
+              (aux (rest tys) si))
 
              ;; ty2 is a unification variable
              (type-unif-var? ty2)
@@ -106,13 +104,10 @@
               (when (some #{ty2} (get-unif-vars ty1))
                 [:ko 'occur-check {:ty1 ty2 :ty2 ty1}])
               (compose-subst si {ty2 ty1}) :as [_ si]
-              (aux (map (fn [[x y]]
-                          [(apply-subst-ty si x) (apply-subst-ty si y)])
-                        (rest tys)) si))
+              (aux (rest tys) si))
 
-             ;; ty1 and ty2 are arrow types or applied constructors
-             (and (syn/applied-type-constructor? ty1) (syn/applied-type-constructor? ty2)
-                  (= (first ty1) (first ty2)))
+             ;; ty1 and ty2 are arrow types
+             (and (syn/arrow-type? ty1) (syn/arrow-type? ty2))
              (let [[ty1 ty2]
                    (cond
                      (< (count ty1) (count ty2))
@@ -120,7 +115,15 @@
                      (> (count ty1) (count ty2))
                      [(syn/curry-arrow ty1 (- (count ty1) (count ty2))) ty2]
                      :else [ty1 ty2])]
-               (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2)) (rest tys)) si))
+               (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2))
+                              (rest tys)) si))
+
+             ;; ty1 and ty2 are applied type constructors
+             (and (syn/applied-type-constructor? ty1)
+                  (syn/applied-type-constructor? ty2)
+                  (= (first ty1) (first ty1)) (= (count ty1) (count ty2)))
+             (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2))
+                            (rest tys)) si)
 
              ;; Types are not unifiable
              :else [:ko 'not-unifiable {:ty1 ty1 :ty2 ty2}]
