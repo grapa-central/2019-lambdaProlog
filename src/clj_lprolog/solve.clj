@@ -87,31 +87,30 @@
 (defn solve
   "Solve `req` in the context of the program `prog`"
   ([prog req]
-   (ok> (solve prog req {} 0) :as [_ [subst _]]
+   (ok> (solve prog [{} (list req)] 0) :as [_ subst]
         (uni/get-free-vars req) :as freevars
         [:ok (u/map-of-pair-list
               (map (fn [x] [x (uni/apply-subst subst x)]) freevars))]))
-  ([prog req si cnt]
-   (ok>
-    ;; Find the applicable clause bodies
-    (compatible-clauses (second (get prog (first req))) req si cnt) :as [poss cnt]
-    ;; If we didn't find any result, ko
-    (when (empty? poss) [:ko 'solve {:req req}])
-    ;; Did we find any immediate result ?
-    (if-let [res (some (fn [p] (when (empty? (second p)) p)) poss)]
-      [:ok [(first res) cnt]]
-      (ok>
-       (map
-        (fn [[si cl]]
-          (ok> (u/ok-reduce
-                (fn [[si cnt] p]
-                  (solve prog (uni/apply-subst si p) si cnt)) [si cnt] cl)))
-        poss) :as ress
-       (filter u/ok-expr? ress) :as ress'
-       (when (empty? ress') [:ko 'solve {:req req :ress ress}])
-       (first ress')))
-    ;; Returning only the first elements is a problem : We can miss the correct response ! We should use an explicit
-    )))
+  ([prog [si req] cnt]
+   (if (empty? req) [:ok si]
+       (ok>
+        ;; Let's try to solve the first constraint
+        (uni/apply-subst si (first req)) :as scrut
+        ;; Find the applicable clause bodies
+        (compatible-clauses (second (get prog (first scrut)))
+                            scrut si cnt) :as [poss cnt]
+        ;; If we didn't find any result, ko
+        (when (empty? poss) [:ko 'solve {:req req}])
+        ;; Research heuristic : start with the possibilities
+        ;; that add the least number of clauses
+        (sort (fn [[_ b1] [_ b2]] (compare (count b1) (count b2))) poss) :as poss
+        ;; Recursive calls (return the first correct one)
+        (some
+         (fn [[si cl]] (let [res (solve prog [si (concat cl (rest req))] cnt)]
+                        (when (u/ok-expr? res) (second res))))
+         poss) :as ress
+        (when (nil? ress) [:ko 'solve {:req req}])
+        [:ok ress]))))
 
 (example
  (solve '{even [(-> nat o) {(even zero) (), (even (succ (succ N))) ((even N))}]}

@@ -34,7 +34,7 @@
 
 ;; Some requests
 (lp/solve '(id (cs X (cs Y ni)) L)) ;; => [:ok ...]
-(lp/solve '(member zero (cs Y (cs X ni)))) ;; => [:ok {Y one}]
+(lp/solve '(member zero (cs Y (cs X ni)))) ;; => [:ok {Y zero}]
 (lp/solve '(member (succ zero) (cs zero (cs zero ni)))) ;; => [:ko ...]
 (lp/solve '(append (cs zero ni) L (cs zero (cs (succ zero) ni)))) ;; => [:ok ...])
 (lp/solve '(append (cs zero ni) L L)) ;; => [:ko ...]

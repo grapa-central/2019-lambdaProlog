@@ -40,9 +40,7 @@
 (lp/type-check-program)
 
 ;; A few requests
-
-;; A few requests
-(lp/solve '(parent gomez Y))
-(lp/solve '(parents X Y wednesday))
-(lp/solve '(siblings X pugsley))
-(lp/solve '(grandparent X Y)) ;; Hummmmm
+(lp/solve '(parent gomez Y)) ;; => [:ok {Y pugsley}]
+(lp/solve '(parents X Y wednesday)) ;; => [:ok {X gomez Y morticia}]
+(lp/solve '(siblings X pugsley)) ;; => [:ok {X wednesday}]
+(lp/solve '(grandparent X Y)) ;; => [:ok {X grandmama Y pugsley}]
