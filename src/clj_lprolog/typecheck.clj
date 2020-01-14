@@ -306,8 +306,8 @@
       ;; The head is a user-defined predicate
       (syn/user-const? (first p))
       [(if (contains? prog (first p))
-         (first (get prog (first p)))
-         [:ko 'predicate-not-found {:pred (first p)}]) cnt]
+         (rename-type-vars cnt (first (get prog (first p))))
+         [:ko 'predicate-not-found {:pred (first p)}]) (inc cnt)]
       ;; The head is a free variable
       (syn/free? (first p))
       [(cons '-> (concat

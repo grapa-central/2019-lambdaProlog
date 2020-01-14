@@ -1,6 +1,7 @@
 (ns clj-lprolog.core
   "Provides the top-level functions for the latte-prolog interpreter"
-  (:require [clj-lprolog.presyntax :as syn]
+  (:require [clj-lprolog.utils :as u]
+            [clj-lprolog.presyntax :as syn]
             [clj-lprolog.typecheck :as typ]
             [clj-lprolog.solve :as sol]))
 
@@ -23,4 +24,10 @@
 
 (defn solve
   "Solve the request `req`"
-  [req] (sol/solve (deref syn/progpreds) req))
+  [req] (u/ok>
+         (syn/parse-applied-pred req) :as [_ req]
+         [:ko> 'parse-request {:req req}]
+         (typ/elaborate-and-freevar-pred
+          (deref syn/progconsts) (deref syn/progpreds) req) :as [_ req _]
+         [:ko> 'typecheck-request {:req req}]
+         (sol/solve (deref syn/progpreds) req)))

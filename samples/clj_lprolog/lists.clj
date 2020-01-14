@@ -1,7 +1,10 @@
 (ns clj-lprolog.lists
   (:require [clj-lprolog.core :as lp]))
 
-;; Lists of natural numbers
+;; We will need the nats for future requests
+(load-file "samples/clj_lprolog/nat.clj")
+
+;; Generic lists
 (lp/deftype '(list A))
 (lp/defconst 'ni '(list A))
 (lp/defconst 'cs '(-> A (list A) (list A)))
@@ -32,7 +35,7 @@
 ;; Some requests
 (lp/solve '(id (cs X (cs Y ni)) L)) ;; => [:ok ...]
 (lp/solve '(member zero (cs Y (cs X ni)))) ;; => [:ok {Y one}]
-(lp/solve '(member (succ zero) (cs zero (cs zero no)))) ;; => [:ko ...]
+(lp/solve '(member (succ zero) (cs zero (cs zero ni)))) ;; => [:ko ...]
 (lp/solve '(append (cs zero ni) L (cs zero (cs (succ zero) ni)))) ;; => [:ok ...])
 (lp/solve '(append (cs zero ni) L L)) ;; => [:ko ...]
 (lp/solve '(reverse (cs (succ zero) (cs zero ni)) L)) ;; => [:ok ...]
