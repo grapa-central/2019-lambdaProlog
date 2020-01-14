@@ -107,9 +107,10 @@
                 (fn [[si cnt] p]
                   (solve prog (uni/apply-subst si p) si cnt)) [si cnt] cl)))
         poss) :as ress
-       (filter u/ok-expr? ress) :as ress
-       (when (empty? ress) [:ko 'solve {:req req}])
-       (first ress)))
+       (filter u/ok-expr? ress) :as ress'
+       (when (empty? ress') [:ko 'solve {:req req :ress ress}])
+       (first ress')))
+    ;; Returning only the first elements is a problem : We can miss the correct response ! We should use an explicit
     )))
 
 (example

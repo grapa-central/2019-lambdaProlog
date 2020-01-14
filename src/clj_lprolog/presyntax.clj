@@ -244,7 +244,7 @@
   Also check well-formedness"
   [n t]
   `(if (and (pred? ~n) (proper-type? ~t))
-     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t {}])))
+     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t '()])))
   [:ko 'defpred {:n ~n :t ~t}]))
 
 (defmacro addclause
@@ -260,7 +260,8 @@
                     (if-let [prev# (get @progpreds (first head#))]
                       (assoc pp# (first head#)
                              (list (first prev#)
-                                   (assoc (second prev#) head# body#))))))))))
+                                   (concat (second prev#)
+                                           (list [head# body#])))))))))))
 
 (defn start
   "Reset the program environment"

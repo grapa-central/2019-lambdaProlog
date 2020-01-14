@@ -402,7 +402,7 @@
         (fn [[pred [ty clauses]]]
           (ok> (u/ok-map (fn [c] (elaborate-clause consts prog c))
                          clauses) :as [_ clauses]
-               [:ok [pred [ty (u/map-of-pair-list (map (fn [[t]] t) clauses))]]]))
+               [:ok [pred [ty (map (fn [[t]] t) clauses)]]]))
         prog) :as [_ prog]
        [:ok (u/map-of-pair-list (map (fn [[c]] c) prog))]))
 
