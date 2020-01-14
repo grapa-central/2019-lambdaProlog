@@ -24,6 +24,17 @@
 ;; reverse a list
 (lp/defpred 'reverse '(-> (list A) (list A) o))
 (lp/addclause '((reverse ni ni)))
-(lp/addclause '((reverse (cs X L1) L2) :- (reverse L1 L3), (append L3 (cs X ni) L2)))
+(lp/addclause '((reverse (cs X L1) L2) :-
+                (reverse L1 L3), (append L3 (cs X ni) L2)))
 
 (lp/type-check-program)
+
+;; Some requests
+(lp/solve '(id (cs X (cs Y ni)) L)) ;; => [:ok ...]
+(lp/solve '(member zero (cs Y (cs X ni)))) ;; => [:ok {Y one}]
+(lp/solve '(member (succ zero) (cs zero (cs zero no)))) ;; => [:ko ...]
+(lp/solve '(append (cs zero ni) L (cs zero (cs (succ zero) ni)))) ;; => [:ok ...])
+(lp/solve '(append (cs zero ni) L L)) ;; => [:ko ...]
+(lp/solve '(reverse (cs (succ zero) (cs zero ni)) L)) ;; => [:ok ...]
+(lp/solve '(reverse (cs (succ zero) (cs zero ni))
+                    (cs (succ zero) (cs zero ni)))) ;; => [:ko ...]

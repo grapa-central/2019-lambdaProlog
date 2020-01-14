@@ -35,7 +35,7 @@
 
 (defn apply-subst
   "Apply a substitution `si` to a type `ty`"
-  [si ty] (reduce (fn [ty [var t]] (subst var t ty)) ty si))
+  [si term] (reduce (fn [term [var t]] (subst var t term)) term si))
 
 (defn subst-clash?
   "Check if there is a clash between `s1` and `s2`"
@@ -49,12 +49,28 @@
 (defn apply-subst-subst
   "Apply `s1` to every value of `s2`"
   [s1 s2] (u/map-of-pair-list
-           (map (fn [[k ty]] [k (apply-subst s1 ty)]) s2)))
+           (map (fn [[k term]] [k (apply-subst s1 term)]) s2)))
 
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
   [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
-               [:ok (conj s1 (apply-subst-subst s1 s2))]))
+               [:ok (conj (apply-subst-subst s2 s1) (apply-subst-subst s1 s2))]))
+
+(defn compose-subst-sets
+  "Compose the sets of substitutions `s1` and `s2`.
+  Keep all of the non-clashing substitution pair"
+  [s1 s2]
+  (set (map
+        (fn [[_ s]] s)
+        (filter u/ok-expr?
+                (reduce (fn [se s1] (clojure.set/union
+                                    se
+                                    (map (fn [s2] (compose-subst s1 s2)) s2)))
+                        #{} s1)))))
+
+(example
+ (compose-subst-sets '#{{A a} {B b}} '#{{A a} {B a}})
+ => '#{{A a} {A a B a} {B b A a}})
 
 ;;{
 ;; # First order unification
