@@ -88,7 +88,7 @@
   "Solve `req` in the context of the program `prog`"
   ([prog req]
    (ok> (solve prog [{} (list req)] 0) :as [_ subst]
-        (uni/get-free-vars req) :as freevars
+        (uni/get-freevars req) :as freevars
         [:ok (u/map-of-pair-list
               (map (fn [x] [x (uni/apply-subst subst x)]) freevars))]))
   ([prog [si req] cnt]

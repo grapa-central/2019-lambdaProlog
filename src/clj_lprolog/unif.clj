@@ -9,6 +9,21 @@
 (def +examples-enabled+ true)
 
 ;;{
+;; Utilities
+;;}
+
+(defn get-freevars
+  "Get the set of free variables in `t`"
+  [t] (cond
+        (syn/free? t) #{t}
+        (syn/lambda? t) (get-freevars (nth t 2))
+        (syn/application? t)
+        (reduce (fn [s t] (clojure.set/union s (get-freevars t))) #{} t)
+        :else #{}))
+
+(example (get-freevars '((λ 2 (A B)) C B)) => '#{A B C})
+
+;;{
 ;; # Substitution utilities
 ;;
 ;; Similar to the ones used in the typechecker
@@ -89,17 +104,6 @@
 
 (example (first-order-term? '(cs A B)) => true)
 
-(defn get-free-vars
-  "Get the set of free variables in `t`"
-  [t] (cond
-        (syn/free? t) #{t}
-        (syn/lambda? t) (get-free-vars (nth t 2))
-        (syn/application? t)
-        (reduce (fn [s t] (clojure.set/union s (get-free-vars t))) #{} t)
-        :else #{}))
-
-(example (get-free-vars '((λ 2 (A B)) C B)) => '#{A B C})
-
 (defn mgu-first-order
   "Returns a unifying substitution of `t1` and `t2`, two first order terms"
   [t1 t2]
@@ -115,7 +119,7 @@
              ;; t1 is a unification variable
              (syn/free? t1)
              (ok>
-              (when (some #{t1} (get-free-vars t2))
+              (when (some #{t1} (get-freevars t2))
                 [:ko 'occur-check {:t1 t1 :t2 t2}])
               (compose-subst si {t1 t2}) :as [_ si]
               [:ko> 'mgu-first-order {:t1 t1 :t2 t2}]
@@ -124,7 +128,7 @@
              ;; t2 is a unification variable
              (syn/free? t2)
              (ok>
-              (when (some #{t2} (get-free-vars t1))
+              (when (some #{t2} (get-freevars t1))
                 [:ko 'occur-check {:t1 t2 :t2 t1}])
               (compose-subst si {t2 t1}) :as [_ si]
               [:ko> 'mgu-first-order {:t1 t1 :t2 t2}]
@@ -178,17 +182,6 @@
 
 (example (unif-var? '(λ 0 (C))) => true)
 
-(defn term-unknowns
-  "Get the set of unknown unification variables appearing in `t`"
-  [t] (cond
-        (syn/free? t) #{t}
-        (syn/lambda? t) (term-unknowns (nth t 2))
-        (syn/application? t)
-        (reduce (fn [s t] (clojure.set/union s (term-unknowns t))) #{} t)
-        :else #{}))
-
-(example (term-unknowns '((λ 2 (A #{0})) A B (+ D C))) => #{'A 'B 'C 'D})
-
 (defn trivial
   "Trivial unification : find the pairs containing a unification var
    and substitute them"
@@ -197,10 +190,10 @@
            (some
             #(cond
                (and (unif-var? (first %))
-                    (not (contains? (term-unknowns (second %)) (head (first %)))))
+                    (not (contains? (get-freevars (second %)) (head (first %)))))
                [(head (first %)) (second %)]
                (and (unif-var? (second %))
-                    (not (contains? (term-unknowns (first %)) (head (second %)))))
+                    (not (contains? (get-freevars (first %)) (head (second %)))))
                [(head (second %)) (first %)])
             pairs)]
     (trivial (filter

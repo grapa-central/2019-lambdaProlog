@@ -5,6 +5,13 @@
             [clj-lprolog.typecheck :as typ]
             [clj-lprolog.norm :as nor]))
 
+;; Tests on utilities
+
+(t/deftest get-freevars-test
+  (t/is (= #{} (uni/get-freevars '(λ 1 #{0}))))
+  (t/is (= #{'A} (uni/get-freevars '(λ 1 A))))
+  (t/is (= #{'A 'B} (uni/get-freevars '(A B A)))))
+
 ;; Tests on substitution
 
 (t/deftest subst-test
@@ -40,11 +47,6 @@
     (t/is (not (uni/unif-var? '(λ 1 (A)))))
     (t/is (not (uni/unif-var? '(λ 0 (A B)))))
     (t/is (not (uni/unif-var? '(λ 0 (O)))))))
-
-(t/deftest term-unknowns-test
-  (t/is (= #{} (uni/term-unknowns '(λ 1 #{0}))))
-  (t/is (= #{'A} (uni/term-unknowns '(λ 1 A))))
-  (t/is (= #{'A 'B} (uni/term-unknowns '(A B A)))))
 
 (t/deftest trivial-test
   (t/is (= '() (uni/trivial '([(λ 0 (#{0})) (λ 0 (A))]))))

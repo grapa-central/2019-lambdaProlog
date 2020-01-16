@@ -30,8 +30,19 @@
   (t/is (u/ko-expr?
          (sol/unify-clause '(even zero) '[(even (succ N)) ((odd N))]))))
 
+(def listsprog
+  '{member [(-> A (list A) o)
+            ([(member X (cs X L)) ()] [(member X (cs Y L)) ((member X L))])]
+    append [(-> (list A) (list A) o)
+            ([(append ni L L) ()]
+             [(append (cs X L1) L2 (cs X L3)) ((append L1 L2 L3))])]
+    reverse [(-> (list A) (list A) o)
+             ([(reverse ni ni) ()]
+              [(reverse (cs X L1) L2)
+               ((reverse L1 L3) (append L3 (cs X ni) L2))])]})
+
 (t/deftest solve-test
-  (t/testing "positive"
+  (t/testing "oddeven"
     (t/is (= '[:ok {N (succ zero)}]
              (sol/solve
               '{even [(-> nat o) {(even zero) (),
@@ -43,4 +54,21 @@
                                   (even (succ N)) ((odd N))}]
                 odd [(-> nat o) {(odd (succ zero)) (),
                                   (odd (succ N)) ((even N))}]}
-              '(even (succ (succ N))))))))
+              '(even (succ (succ N)))))))
+  (t/testing "lists"
+    (t/is (u/ok-expr?
+           (sol/solve listsprog '(member zero (cs X (cs Y ni))))))
+    (t/is (u/ko-expr?
+           (sol/solve listsprog
+                      '(member (succ zero) (cs zero (cs zero ni))))))
+    (t/is (u/ok-expr?
+           (sol/solve listsprog
+                      '(append (cs zero ni) L (cs zero (cs (succ zero) ni))))))
+    (t/is (u/ko-expr?
+           (sol/solve listsprog '(append (cs zero ni) L L))))
+    (t/is (u/ok-expr?
+           (sol/solve listsprog '(reverse (cs (succ zero) (cs zero ni))
+                                          (cs zero (cs (succ zero) ni))))))
+    (t/is (u/ko-expr?
+           (sol/solve listsprog '(reverse (cs (succ zero) (cs (zero ni)))
+                                          (cs (succ zero) (cs (zero ni)))))))))
