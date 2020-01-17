@@ -340,7 +340,7 @@
 
 (defn huet
   "Huet research procedure for unifying the pair <`t1`, `t2`>"
-  ([pairs] (huet pairs {} 3)) ;; Low fuel for now
+  ([pairs] (huet pairs {} 100)) ;; Low fuel for now
   ([pairs subst fuel]
    (ok>
     ;; Check the fuel
