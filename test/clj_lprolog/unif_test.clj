@@ -56,8 +56,8 @@
 
 (t/deftest simpl-test
   (t/testing "positive"
-    (t/is (= '[:ok ()] (uni/simpl '([(λ 0 (#{0})) (λ 0 (A))]))))
-    (t/is (= '[:ok ([(λ 2 (A)) (λ 2 (#{1}))])]
+    (t/is (= '[:ok () {A (λ 0 (#{0}))}] (uni/simpl '([(λ 0 (#{0})) (λ 0 (A))]))))
+    (t/is (= '[:ok ([(λ 2 (A)) (λ 2 (#{1}))]) {}]
              (uni/simpl '([(λ 2 (S A)) (λ 2 (S #{1}))])))))
   (t/testing "negative"
     (t/is (u/ko-expr? (uni/simpl '([(λ 2 (#{0})) (λ 2 (#{1}))]))))))
@@ -83,10 +83,10 @@
           (uni/match t1 t2))))
 
 (t/deftest match-test
-  (t/is (= '#{[A (λ 2 (+ (H0 #{1} #{0}) (H1 #{1} #{0})))] ;; Imitation
-              [A (λ 2 (#{0}))] [A (λ 2 (#{1}))]} ;; Projections
+  (t/is (= '#{{A (λ 2 (+ (H0 #{1} #{0}) (H1 #{1} #{0})))} ;; Imitation
+              {A (λ 2 (#{0}))} {A (λ 2 (#{1}))}} ;; Projections
            (type-and-match '(λ 2 (A #{0} #{1})) '(λ 2 (+ #{1} #{0})))))
-  (t/is (= '#{[A (λ 2 (#{0} (H0 #{1} #{0})))]} ;; Projection
+  (t/is (= '#{{A (λ 2 (#{0} (H0 #{1} #{0})))}} ;; Projection
            (type-and-match '(λ 2 (A #{0} #{1})) '(λ 2 ((λ 1 (#{0} O)) #{1}))))))
 
 (defn test-match-meta

@@ -182,28 +182,33 @@
 
 (example (unif-var? '(λ 0 (C))) => true)
 
+(defn trivial-substitutions
+  "Get the trivial substitutions from the pairs containing a unification var"
+  [pairs]
+  (u/ok-reduce
+   (fn [subst [t1 t2]]
+     (cond
+       (and (unif-var? t1) (not (contains? (get-freevars t2) (head t1))))
+       (compose-subst subst {(head t1) t2})
+       (and (unif-var? t2) (not (contains? (get-freevars t1) (head t2))))
+       (compose-subst subst {(head t2) t1})
+       :else [:ok subst])) {} pairs))
+
+(example (trivial-substitutions '([(λ 0 (A)) (λ 0 (S (S #{0})))]))
+         => '[:ok {A (λ 0 (S (S #{0})))}])
+
 (defn trivial
   "Trivial unification : find the pairs containing a unification var
    and substitute them"
   [pairs]
-  (if-let [[var t]
-           (some
-            #(cond
-               (and (unif-var? (first %))
-                    (not (contains? (get-freevars (second %)) (head (first %)))))
-               [(head (first %)) (second %)]
-               (and (unif-var? (second %))
-                    (not (contains? (get-freevars (first %)) (head (second %)))))
-               [(head (second %)) (first %)])
-            pairs)]
-    (trivial (filter
-              (fn [[t1 t2]] (not= t1 t2))
-              (map (fn [[t1 t2]] [(nor/normalize (subst var t t1))
-                                 (nor/normalize (subst var t t2))])
-                   pairs)))
-    pairs))
+  (ok> (trivial-substitutions pairs) :as [_ subst]
+       (filter
+        (fn [[t1 t2]] (not= t1 t2))
+        (map (fn [[t1 t2]] [(nor/normalize (apply-subst subst t1))
+                           (nor/normalize (apply-subst subst t2))])
+             pairs))))
 
-(example (trivial '([(λ 0 (A)) (λ 0 (S))] [(λ 0 (B)) (λ 0 (A O))]
+(example (trivial '([(λ 0 (A)) (λ 0 (S))]  [(λ 0 (B)) (λ 0 (A O))]
                     [(λ 2 (C)) (λ 2 (A B))]))
          => '([(λ 2 (C)) (λ 2 (S (S O)))]))
 
@@ -222,108 +227,111 @@
   "Simplification : among a number of pairs, apply the trivial procedure,
   then decompose the head normal forms and
   unify the parameters of rigide-rigide pairs"
-  [pairs] (if (empty? pairs) [:ok pairs]
-              (let [pairs (trivial (map (fn [[t1 t2]]
-                                          [(nor/normalize t1) (nor/normalize t2)])
-                                        pairs))]
-                ;; If there is no rigid-rigid pair left, its over
-                (if (every? (fn [[t1 t2]]
-                              (or (flexible? t1) (flexible? t2))) pairs)
-                  [:ok pairs]
-                  (let [[t1 t2]
-                        (some
-                         (fn [[t1 t2]]
-                           (when (and (rigid? t1) (rigid? t2))) [t1 t2])
-                         pairs)
-                        pairs (u/remove-first
-                               (fn [[t1 t2]] (and (rigid? t1) (rigid? t2))) pairs)]
-                    (if (or (not= (second t1) (second t2))
-                            (not= (head t1) (head t2)))
-                      [:ko 'not-unifiable {:t1 t1 :t2 t2}]
-                      (simpl
-                       (concat
-                        pairs
-                        (map
-                         (fn [[e1 e2]]
-                           [(normal-form-arg e1 (second t1) (typ/type-of t1))
-                            (normal-form-arg e2 (second t2) (typ/type-of t2))])
-                         (map vector (tail t1) (tail t2)))))))))))
+  ([pairs] (simpl pairs {}))
+  ([pairs subst]
+   (ok> (trivial-substitutions pairs) :as [_ subst2]
+          (compose-subst subst subst2) :as [_ subst]
+          (filter
+           (fn [[t1 t2]] (not= t1 t2))
+           (map (fn [[t1 t2]] [(nor/normalize (apply-subst subst t1))
+                               (nor/normalize (apply-subst subst t2))])
+                pairs)) :as pairs
+          (if (or (empty? pairs)
+                  (every? (fn [[t1 t2]]
+                            (or (flexible? t1) (flexible? t2))) pairs))
+            [:ok pairs subst]
+            (ok>
+             (some
+              (fn [[t1 t2]]
+                (when (and (rigid? t1) (rigid? t2))) [t1 t2])
+              pairs) :as [t1 t2]
+             (u/remove-first
+              (fn [[t1 t2]] (and (rigid? t1) (rigid? t2))) pairs) :as pairs
+             (when (or (not= (second t1) (second t2))
+                       (not= (head t1) (head t2)))
+               [:ko 'not-unifiable {:t1 t1 :t2 t2}])
+               (simpl
+                (concat
+                 pairs
+                 (map
+                  (fn [[e1 e2]]
+                    [(normal-form-arg e1 (second t1) (typ/type-of t1))
+                     (normal-form-arg e2 (second t2) (typ/type-of t2))])
+                  (map vector (tail t1) (tail t2)))) subst))))))
 
 (example (simpl '([(λ 0 (A)) (λ 0 (S))] [(λ 2 (A (B))) (λ 2 (A #{1}))])) =>
-         '[:ok ([(λ 2 (B)) (λ 2 (#{1}))])])
+         '[:ok ([(λ 2 (B)) (λ 2 (#{1}))]) {A (λ 0 (S))}])
 
 (defn fresh-unknown [count] (symbol (str "H" count)))
 
+(defn eta-fresh-unknown
+  "Generate an application of a fresh variable `i` to `k` arguments
+  following the input type `ty` with return type `rty`"
+  [i k ty rty] (with-meta
+                 (cons (with-meta
+                         (fresh-unknown i)
+                         {:ty (concat
+                               (take (inc k) ty)
+                               (list rty))})
+                       (nor/eta-params ty))
+                 {:ty rty}))
+
 (defn match
   "Non deterministic Match procedure : takes a flexible-rigid pair <`e1`, `e2`>,
-  and return a set of possible candidates for unification,
+  and return a set of possible substitutions for unification,
   using imitation and projection"
   ([e1 e2] (first (match e1 e2 0)))
   ([e1 e2 cunknown]
-  (let [v (head e1)
-        vty (typ/type-of v)
-        n (count (syn/param-types vty))
+   (ok> (head e1) :as v
+        (typ/type-of v) :as vty
+        (count (syn/param-types vty)) :as n
         ;; Imitation
-        [imitation cunknown]
         (if (or (syn/primitive? (head e2)) (syn/user-const? (head e2)))
-          [#{[v
-             (with-meta
-               (list 'λ n
-                     (with-meta
-                       (cons (head e2)
-                             (let [n (second e2)
-                                   ty (typ/type-of (head e2))]
-                               (map
-                                (fn [[e i]] (with-meta
-                                         (cons (with-meta
-                                                 (fresh-unknown i)
-                                                 {:ty (concat
-                                                       (take (inc n) ty)
-                                                       (list (typ/type-of e)))})
-                                               (nor/eta-params ty))
-                                         {:ty (typ/type-of e)}))
-                                (map vector (tail e2)
-                                     (take (count (tail e2))
-                                           (iterate inc cunknown))))))
-                       {:ty (typ/type-of (nth e2 2))}))
-               {:ty (typ/type-of v)})]} (+ cunknown (count (tail e2)))]
-          [#{} cunknown])
+          [#{{v
+              (with-meta
+                (list 'λ n
+                      (with-meta
+                        (cons (head e2)
+                              (let [k (second e2)
+                                    ty (typ/type-of (head e2))]
+                                (map
+                                 (fn [[e i]]
+                                   (eta-fresh-unknown i k ty (typ/type-of e)))
+                                 (map vector (tail e2)
+                                      (take (count (tail e2))
+                                            (iterate inc cunknown))))))
+                        {:ty (typ/type-of (nth e2 2))}))
+                {:ty (typ/type-of v)})}} (+ cunknown (count (tail e2)))]
+          [#{} cunknown]) :as [imitation cunknown]
         ;; Projections
-        [projections cunknown]
-        (let [beta (syn/return-type vty)]
-          (reduce
-           (fn [[s cunknown] [i ty]]
-             [(conj
-               s [v
+        (syn/return-type vty) :as beta
+        (reduce
+         (fn [[s cunknown] [i ty]]
+           (ok>
+            (clojure.set/union
+             s #{{v
                   (with-meta
                     (list 'λ n
                           (with-meta
                             (cons (with-meta #{i} {:ty ty})
-                                  (map (fn [[ty cunknown]]
-                                         (with-meta
-                                           (cons
-                                            (with-meta
-                                              (fresh-unknown cunknown)
-                                              {:ty (concat
-                                                    (take (inc n) vty)
-                                                    (list ty))})
-                                            (nor/eta-params vty))
-                                           {:ty ty}))
+                                  (map (fn [[ty i]]
+                                         (eta-fresh-unknown i n vty ty))
                                        (map vector (syn/param-types ty)
                                             (take (count (syn/param-types ty))
                                                   (iterate inc cunknown)))))
                             {:ty beta}))
-                    {:ty vty})]) (+ cunknown (count (syn/param-types ty)))])
-           [#{} cunknown]
-           (filter (fn [[i ty]] (= beta (syn/return-type ty)))
-                   (map (fn [i] [i (typ/type-of (nth (reverse (tail e1)) i))])
-                        (take (count (tail e1)) (iterate inc 0)))))
-          )]
-    [(clojure.set/union imitation projections) cunknown])))
+                    {:ty vty})}}) :as s
+            [s (+ cunknown (count (syn/param-types ty)))]))
+         [#{} cunknown]
+         (filter (fn [[i ty]] (= beta (syn/return-type ty)))
+                 (map (fn [i] [i (typ/type-of (nth (reverse (tail e1)) i))])
+                      (take (count (tail e1)) (iterate inc 0)))))
+        :as [projections cunknown]
+        [(clojure.set/union imitation projections) cunknown])))
 
 (defn huet
   "Huet research procedure for unifying `t1` and `t2`"
-  [t1 t2] (ok> (simpl (list [t1 t2])) :as [_ N]
+  [t1 t2] (ok> (simpl (list [t1 t2])) :as [_ N substs]
                (match (first (first N)) (second (first N)))
                ;; TODO
                ))
