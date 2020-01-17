@@ -317,10 +317,12 @@
     (syn/destruct-arrow ty (count (rest p))) :as [params res]
     (when (not= res 'o)
       [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
-    (u/ok-reduce (fn [[res cnt] [t ty]]
-                   (ok> (check-and-elaborate-term consts t ty cnt) :as [_ t cnt]
-                        [:ok [(cons t res) cnt]]))
-                 ['() cnt] (map vector (rest p) params)) :as [_ [tl cnt]]
+    (u/ok-reduce
+     (fn [[res cnt] [t ty]]
+       (ok> (u/map-of-pair-list (map (fn [[x [ty _]]] [x ty]) prog)) :as prog
+            (check-and-elaborate-term (conj prog consts) t ty cnt) :as [_ t cnt]
+            [:ok [(cons t res) cnt]]))
+     ['() cnt] (map vector (rest p) params)) :as [_ [tl cnt]]
     [:ko> 'elaborate-pred {:pred p}]
     [:ok (cons (with-meta (first p) {:ty ty}) (reverse tl)) cnt])))
 
