@@ -233,6 +233,8 @@
   "Recursively simplify a term as much as possible"
   [t] (with-meta
         (cond
+          ;; t is a beta-redex
+          (syn/beta-redex? t) (simplify-term (implicit-reduce t))
           ;; t is an abstraction
           (syn/lambda? t)
           (flatten-zero-lambda

@@ -64,7 +64,7 @@
 (defn apply-subst-subst
   "Apply `s1` to every value of `s2`"
   [s1 s2] (u/map-of-pair-list
-           (map (fn [[k term]] [k (apply-subst s1 term)]) s2)))
+           (map (fn [[k term]] [k (nor/simplify-term (apply-subst s1 term))]) s2)))
 
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
@@ -195,7 +195,7 @@
        :else [:ok subst])) {} pairs))
 
 (example (trivial-substitutions '([(λ 0 (A)) (λ 0 (S (S #{0})))]))
-         => '[:ok {A (λ 0 (S (S #{0})))}])
+         => '[:ok {A (S (S #{0}))}])
 
 (defn trivial
   "Trivial unification : find the pairs containing a unification var
@@ -229,38 +229,39 @@
   unify the parameters of rigide-rigide pairs"
   ([pairs] (simpl pairs {}))
   ([pairs subst]
-   (ok> (trivial-substitutions pairs) :as [_ subst2]
-          (compose-subst subst subst2) :as [_ subst]
-          (filter
-           (fn [[t1 t2]] (not= t1 t2))
-           (map (fn [[t1 t2]] [(nor/normalize (apply-subst subst t1))
-                               (nor/normalize (apply-subst subst t2))])
-                pairs)) :as pairs
-          (if (or (empty? pairs)
-                  (every? (fn [[t1 t2]]
-                            (or (flexible? t1) (flexible? t2))) pairs))
-            [:ok pairs subst]
-            (ok>
-             (some
-              (fn [[t1 t2]]
-                (when (and (rigid? t1) (rigid? t2))) [t1 t2])
-              pairs) :as [t1 t2]
-             (u/remove-first
-              (fn [[t1 t2]] (and (rigid? t1) (rigid? t2))) pairs) :as pairs
-             (when (or (not= (second t1) (second t2))
-                       (not= (head t1) (head t2)))
-               [:ko 'not-unifiable {:t1 t1 :t2 t2}])
-               (simpl
-                (concat
-                 pairs
-                 (map
-                  (fn [[e1 e2]]
-                    [(normal-form-arg e1 (second t1) (typ/type-of t1))
-                     (normal-form-arg e2 (second t2) (typ/type-of t2))])
-                  (map vector (tail t1) (tail t2)))) subst))))))
+   (ok>
+    (map (fn [[t1 t2]] [(nor/normalize t1) (nor/normalize t2)]) pairs) :as pairs
+    (trivial-substitutions pairs) :as [_ subst2]
+    (compose-subst subst subst2) :as [_ subst]
+    (filter
+     (fn [[t1 t2]] (not= t1 t2))
+     (map (fn [[t1 t2]] [(nor/normalize (apply-subst subst t1))
+                        (nor/normalize (apply-subst subst t2))])
+          pairs)) :as pairs
+    (if (or (empty? pairs)
+            (every? (fn [[t1 t2]]
+                      (or (flexible? t1) (flexible? t2))) pairs))
+      [:ok pairs subst]
+      (ok>
+       (some
+        (fn [[t1 t2]]
+          (when (and (rigid? t1) (rigid? t2))) [t1 t2])
+        pairs) :as [t1 t2]
+       (u/remove-first
+        (fn [[t1 t2]] (and (rigid? t1) (rigid? t2))) pairs) :as pairs
+       (when (or (not= (second t1) (second t2))
+                 (not= (head t1) (head t2)))
+         [:ko 'not-unifiable {:t1 t1 :t2 t2}])
+       (simpl
+        (concat pairs
+                (map
+                 (fn [[e1 e2]]
+                   [(normal-form-arg e1 (second t1) (typ/type-of t1))
+                    (normal-form-arg e2 (second t2) (typ/type-of t2))])
+                 (map vector (tail t1) (tail t2)))) subst))))))
 
 (example (simpl '([(λ 0 (A)) (λ 0 (S))] [(λ 2 (A (B))) (λ 2 (A #{1}))])) =>
-         '[:ok ([(λ 2 (B)) (λ 2 (#{1}))]) {A (λ 0 (S))}])
+         '[:ok ([(λ 2 (B)) (λ 2 (#{1}))]) {A S}])
 
 (defn fresh-unknown [count] (symbol (str "H" count)))
 
@@ -329,12 +330,44 @@
         :as [projections cunknown]
         [(clojure.set/union imitation projections) cunknown])))
 
+(defn find-flexible-rigid
+  "Find a flexible-rigid pair in `pairs`"
+  [pairs] (some (fn [[t1 t2]]
+                  (cond
+                    (and (flexible? t1) (rigid? t2)) [t1 t2]
+                    (and (rigid? t1) (flexible? t2)) [t1 t2]
+                    :else nil)) pairs))
+
 (defn huet
-  "Huet research procedure for unifying `t1` and `t2`"
-  [t1 t2] (ok> (simpl (list [t1 t2])) :as [_ N substs]
-               (match (first (first N)) (second (first N)))
-               ;; TODO
-               ))
+  "Huet research procedure for unifying the pair <`t1`, `t2`>"
+  ([pairs] (huet pairs {} 3)) ;; Low fuel for now
+  ([pairs subst fuel]
+   (ok>
+    ;; Check the fuel
+    (when (<= fuel 0) [:ko 'out-of-fuel])
+    ;; Simplify the pair
+    (map (fn [[t1 t2]] [(apply-subst subst t1)
+                       (apply-subst subst t2)]) pairs) :as pairs
+    (simpl pairs) :as [_ N subst2]
+    (compose-subst subst subst2) :as [_ subst]
+    (if (empty? N) [:ok #{subst}]
+        ;; Find a flexible-rigid pair in N
+        (if-let [[t1 t2] (find-flexible-rigid N)]
+          (ok>
+           (match t1 t2) :as substs
+           (set (u/map-filter (fn [subst2]
+                                (let [subst (compose-subst subst subst2)]
+                                  (if (u/ok-expr? subst) (second subst))))
+                              substs)) :as substs
+           (u/map-filter
+            (fn [subst]
+              (let [v (huet N subst (dec fuel))]
+                (if (u/ok-expr? v) (second v)))) substs) :as substs
+           (reduce (fn [s1 s2] (clojure.set/union s1 s2))
+                        #{} substs) :as substs
+           [:ok substs])
+          [:ok #{subst}]))
+    )))
 
 ;;{
 ;; Top-level unification procedure
@@ -348,6 +381,4 @@
                 t2 (nor/simplify-term t2)]
             (if (and (first-order-term? t1) (first-order-term? t2))
               (first-order-unify t1 t2)
-              [:ko 'todo-huet]
-              ;; (huet t1 t2)
-              )))
+              (huet (list [t1 t2])))))

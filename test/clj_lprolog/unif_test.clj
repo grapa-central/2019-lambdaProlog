@@ -56,7 +56,7 @@
 
 (t/deftest simpl-test
   (t/testing "positive"
-    (t/is (= '[:ok () {A (λ 0 (#{0}))}] (uni/simpl '([(λ 0 (#{0})) (λ 0 (A))]))))
+    (t/is (= '[:ok () {A zero}] (uni/simpl '([(λ 0 (zero)) (λ 0 (A))]))))
     (t/is (= '[:ok ([(λ 2 (A)) (λ 2 (#{1}))]) {}]
              (uni/simpl '([(λ 2 (S A)) (λ 2 (S #{1}))])))))
   (t/testing "negative"
@@ -103,7 +103,9 @@
   ([consts t1 t2]
    (u/ok> (typ/elaborate-term consts t2) :as [_ t2]
           (typ/check-and-elaborate-term consts t1 (typ/type-of t2)) :as [_ t1]
-          (uni/huet t1 t2))))
+          (uni/huet (list [t1 t2])))))
 
-;; (type-and-huet {'f '(-> tau tau) 't 'tau 'e 'tau}
-;;                '(I (λ 2 (f #{1})) t e) '(λ 0 (t)))
+(t/deftest huet-test
+  (t/is (= '[:ok #{{I (λ 3 #{1})} {I (λ 3 t)}}]
+           (type-and-huet {'f '(-> tau tau) 't 'tau 'e 'tau}
+                          '(I (λ 2 (f #{1})) t e) 't))))
