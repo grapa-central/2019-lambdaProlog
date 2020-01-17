@@ -68,10 +68,11 @@
 (t/deftest parse-test
   (t/testing "successful parsing"
     (t/is (= [:ok '(S N)] (syn/parse '(S N))))
-    (t/is (= [:ok '(λ 2 (#{0} #{1}))] (syn/parse '(λ [x y] (x y)))))
+    (t/is (= [:ok '(λ 2 (#{1} #{0}))] (syn/parse '(λ [x y] (x y)))))
     (t/is (= [:ok '(λ 1 (+ #{0} zero))] (syn/parse '(λ [x] (+ x zero)))))
     (t/is (= [:ok '(λ 1 (A #{0}))] (syn/parse '(λ [x] (A x)))))
-    (t/is (= [:ok '((λ 2 (#{0} #{1})) (λ 1 #{0}))]
+    (t/is (= [:ok '(λ 1 (λ 1 #{0}))] (syn/parse '(λ [f] (λ [x] x)))))
+    (t/is (= [:ok '((λ 2 (#{1} #{0})) (λ 1 #{0}))]
              (syn/parse '((λ [x y] (x y)) (λ [x] x))))))
   (t/testing "failed parsing"
     (t/is (u/ko-expr? (syn/parse '())))))
