@@ -233,7 +233,7 @@
 
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
- (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty1)]
+ (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty0)]
  (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 Ty2 Ty2)]
  (infer-term '((λ 1 #{0}) (S O))) => [:ok 'i])
 
