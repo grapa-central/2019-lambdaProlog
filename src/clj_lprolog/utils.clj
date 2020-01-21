@@ -285,11 +285,35 @@
 (examples
  (every-ok? (fn [x] :ok) '(1 2 3)) => :ok
  (every-ok? (fn [x] [:ko x]) '(1 2 3)) => [:ko 1]
- (every-ok? (fn [x] (if (= x 2) :ok [:ko x])) '(2 2 3 2)) => [:ko 3]
- )
+ (every-ok? (fn [x] (if (= x 2) :ok [:ko x])) '(2 2 3 2)) => [:ko 3])
+
+(defn ok-some
+  "Returns `f` applied to the first element of `l` such that `f` applied to `l`
+  returns an ok-expr"
+  [f l] (loop [l l]
+          (if (empty? l) [:ko 'ok-some]
+              (let [v (f (first l))]
+                (if (ok-expr? v) (second v)
+                    (recur (rest l)))))))
 
 ;; Other utils
 
 (defn map-of-pair-list
   "Turn a list of pairs into a map"
   [l] (reduce (fn [m [k v]] (assoc m k v)) {} l))
+
+(defn remove-first
+  "Remove the first item of `l` that satisfies `p`"
+  [p l] (loop [l l res '()]
+          (cond (empty? l) (reverse res)
+                (p (first l)) (concat (reverse res) (rest l))
+                :else (recur (rest l) (cons (first l) res)))))
+
+(examples
+ (remove-first even? '(1 3 5 7 10)) => '(1 3 5 7)
+ (remove-first even? '(1 3 4 5 7 10)) => '(1 3 5 7 10))
+
+(defn map-filter
+  "Apply `f` to every element of `l`,
+  and keep only the elements where `f` is not returning nil"
+  [f l] (filter some? (map f l)))

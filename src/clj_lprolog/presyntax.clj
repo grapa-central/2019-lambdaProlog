@@ -109,13 +109,18 @@
           (lambda? t)
           (syn/application? t)))
 
-(defn parse-aux
-  "Parse a user term `t` to a kernel term using a naming environment"
-  [t env]
+(defn parse
+  "Parse a user term `t` to a kernel term.
+  Mainly transforms bound variables to De Bruijn indices"
+  ([t] (ok> (parse t '{}) :as [_ t']
+            [:ko> 'parsing-term {:t t}]
+            (if (proper-kernel-term? t') [:ok t']
+                [:ko 'not-a-proper-kernel-term {:t t'}])))
+  ([t env]
   (cond (bound-or-const? t)
-        (if (contains? (first env) t)
+        (if (contains? env t)
           ;; t is really a bound variable
-          [:ok #{(get (first env) t)}]
+          [:ok #{(get env t)}]
           ;; t is actually a use constant
           [:ok t])
 
@@ -124,29 +129,20 @@
         (syn/primitive? t) [:ok t]
 
         (lambda? t)
-        (ok> (parse-aux
-              (nth t 2)
-              (reduce (fn [e x]
-                        (list
-                         (assoc (first e) x (second e))
-                         (+ (second e) 1)))
-                      env (second t))) :as [_ t']
-        [:ok (list 'λ (count (second t)) t')])
+        (ok>
+         (count (second t)) :as n
+         (u/map-of-pair-list
+          (map (fn [[x ind]] [x (+ ind n)]) env)) :as env
+         (reduce (fn [[e n] x] [(assoc e x n) (dec n)])
+                 [env (dec n)] (second t)) :as [env _]
+         (parse (nth t 2) env) :as [_ t']
+         [:ok (list 'λ n t')])
 
         (syn/application? t)
-        (ok> (u/ok-map (fn [t] (parse-aux t env)) t) :as [_ t']
+        (ok> (u/ok-map (fn [t] (parse t env)) t) :as [_ t']
              [:ok (map (fn [[t]] t) t')])
 
-        :else [:ko 'not-a-user-term {:t t}]))
-
-(defn parse
-  "Parse a user term `t` to a kernel term.
-  Mainly transforms bound variables to De Bruijn indices"
-  [t] (ok> (parse-aux t '({} 0)) :as [_ t']
-           [:ko> 'parsing-term {:t t}]
-           (if (proper-kernel-term? t') [:ok t']
-               [:ko 'not-a-proper-kernel-term {:t t'}])))
-
+        :else [:ko 'not-a-user-term {:t t}])))
 
 ;;{
 ;; # Prolog vernacular
@@ -244,7 +240,7 @@
   Also check well-formedness"
   [n t]
   `(if (and (pred? ~n) (proper-type? ~t))
-     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t {}])))
+     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t '()])))
   [:ko 'defpred {:n ~n :t ~t}]))
 
 (defmacro addclause
@@ -260,7 +256,8 @@
                     (if-let [prev# (get @progpreds (first head#))]
                       (assoc pp# (first head#)
                              (list (first prev#)
-                                   (assoc (second prev#) head# body#))))))))))
+                                   (concat (second prev#)
+                                           (list [head# body#])))))))))))
 
 (defn start
   "Reset the program environment"

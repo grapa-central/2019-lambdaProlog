@@ -108,3 +108,6 @@
   (t/is (= 'A (syn/flatten-arrow 'A)))
   (t/is (= '(-> A B C) (syn/flatten-arrow '(-> A (-> B C)))))
   (t/is (= '(-> A B C D) (syn/flatten-arrow '(-> A (-> B (-> C D)))))))
+
+(t/deftest normalize-ty-tes
+  (t/is (= 'A (syn/normalize-ty '(-> A)))))

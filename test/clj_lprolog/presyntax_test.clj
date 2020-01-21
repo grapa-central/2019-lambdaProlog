@@ -34,7 +34,6 @@
     (t/is (syn/proper-arrow-type? '(-> (-> A B) A B))))
   (t/testing "negative"
     (t/is (not (syn/proper-arrow-type? 'A)))
-    (t/is (not (syn/proper-arrow-type? '(-> A))))
     (t/is (not (syn/proper-arrow-type? '(-> A ()))))))
 
 (t/deftest proper-applied-type-constructor?-test
@@ -69,10 +68,11 @@
 (t/deftest parse-test
   (t/testing "successful parsing"
     (t/is (= [:ok '(S N)] (syn/parse '(S N))))
-    (t/is (= [:ok '(λ 2 (#{0} #{1}))] (syn/parse '(λ [x y] (x y)))))
+    (t/is (= [:ok '(λ 2 (#{1} #{0}))] (syn/parse '(λ [x y] (x y)))))
     (t/is (= [:ok '(λ 1 (+ #{0} zero))] (syn/parse '(λ [x] (+ x zero)))))
     (t/is (= [:ok '(λ 1 (A #{0}))] (syn/parse '(λ [x] (A x)))))
-    (t/is (= [:ok '((λ 2 (#{0} #{1})) (λ 1 #{0}))]
+    (t/is (= [:ok '(λ 1 (λ 1 #{0}))] (syn/parse '(λ [f] (λ [x] x)))))
+    (t/is (= [:ok '((λ 2 (#{1} #{0})) (λ 1 #{0}))]
              (syn/parse '((λ [x y] (x y)) (λ [x] x))))))
   (t/testing "failed parsing"
     (t/is (u/ko-expr? (syn/parse '())))))
@@ -151,7 +151,7 @@
   (t/testing "even"
     (do (syn/start)
         (syn/defpred 'even '(-> i o))
-        (t/is (= @syn/progpreds {'even ['(-> i o) {}]}))))
+        (t/is (= @syn/progpreds {'even ['(-> i o) '()]}))))
   (t/testing "even and odd"
     (do (syn/start)
         (syn/defpred 'even '(-> i o))
@@ -165,12 +165,12 @@
         (syn/addclause '((even O)))
         (syn/addclause '((even (S (S N))) :- (even N)))
         (t/is (= @syn/progpreds {'even ['(-> i o)
-                                        {'(even O) '()
-                                         '(even (S (S N))) '((even N))}]}))))
+                                        '([(even O) ()]
+                                          [(even (S (S N))) ((even N))])]}))))
   (t/testing "is the identity"
     (do
       (swap! syn/progpreds (fn [_] {}))
       (syn/defpred 'isid '(-> (-> A A) o))
       (syn/addclause '((isid (λ [x] x))))
       (t/is (= @syn/progpreds {'isid ['(-> (-> A A) o)
-                                      {'(isid (λ 1 #{0})) '()}]})))))
+                                      '([(isid (λ 1 #{0})) ()])]})))))

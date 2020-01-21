@@ -116,9 +116,7 @@
 
 (defn arrow-type?
   "Is `t` an arrow type ?"
-  [t] (and (seq? t)
-           (> (count t) 2)
-           (= (first t) '->)))
+  [t] (and (seq? t) (= (first t) '->)))
 
 (examples
  (arrow-type? '(-> i o)) => true
@@ -129,18 +127,6 @@
   [t] (and (seq? t) (user-type? (first t)) (not (empty? (rest t)))))
 
 (example (applied-type-constructor? '(list nat)) => true)
-
-(defn flatten-one-arrow
-  "Eliminate the '->' of an arrow `ty` if it is of length 1"
-  [ty] (if (= (count ty) 2) (second ty) ty))
-
-(defn destruct-arrow
-  "Get the `n` first parameter of an arrow type `ty`"
-  [ty n] (if (= n 0) ['() (flatten-one-arrow ty)]
-             (if (arrow-type? ty)
-               (let [head (take n (rest ty)) body (nthrest ty (inc n))]
-                 [head (if (> (count body) 1)
-                         (cons '-> body) (first body))]))))
 
 (defn param-types
   "Get the parameter types of `ty` if it is an arrow type, and empty list if not"
@@ -153,10 +139,27 @@
 (defn flatten-arrow
   "Flatten an arrow type `ty` by right associativity"
   [ty] (if (arrow-type? ty)
-           (let [f (take (- (count ty) 1) ty)
-                 l (flatten-arrow (last ty))]
-             (if (arrow-type? l) (concat f (rest l)) (concat f (list l))))
-           ty))
+         (let [f (take (- (count ty) 1) ty)
+               l (flatten-arrow (last ty))]
+           (if (arrow-type? l) (concat f (rest l)) (concat f (list l))))
+         ty))
+
+(defn flatten-one-arrow
+  "Eliminate the '->' of an arrow `ty` if it is of length 1"
+  [ty] (if (and (arrow-type? ty) (= (count ty) 2))
+         (flatten-one-arrow (second ty)) ty))
+
+(defn destruct-arrow
+  "Get the `n` first parameter of an arrow type `ty`"
+  [ty n] (if (= n 0) ['() (flatten-one-arrow ty)]
+             (if (arrow-type? ty)
+               (let [head (take n (rest ty)) body (nthrest ty (inc n))]
+                 [head (if (> (count body) 1)
+                         (cons '-> body) (first body))]))))
+
+(defn normalize-ty
+  "Put `ty` into normal form"
+  [t] (flatten-one-arrow (flatten-arrow t)))
 
 (defn curry-arrow
   "Curry an arrow ty `ty`, that is add parenthesis after the `n` first elements"

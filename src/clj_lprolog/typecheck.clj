@@ -83,7 +83,9 @@
   [ty1 ty2]
   ((fn aux [tys si]
      (if (empty? tys) [:ok si]
-         (let [[ty1 ty2] (first tys)]
+         (let [[ty1 ty2] (first tys)
+               ty1 (syn/normalize-ty (apply-subst-ty si ty1))
+               ty2 (syn/normalize-ty (apply-subst-ty si ty2))]
            (cond
              ;; The two types are the same
              (= ty1 ty2) (recur (rest tys) si)
@@ -94,9 +96,7 @@
               (when (some #{ty1} (get-unif-vars ty2))
                 [:ko 'occur-check {:ty1 ty1 :ty2 ty2}])
               (compose-subst si {ty1 ty2}) :as [_ si]
-              (aux (map (fn [[x y]]
-                          [(apply-subst-ty si x) (apply-subst-ty si y)])
-                        (rest tys)) si))
+              (aux (rest tys) si))
 
              ;; ty2 is a unification variable
              (type-unif-var? ty2)
@@ -104,23 +104,26 @@
               (when (some #{ty2} (get-unif-vars ty1))
                 [:ko 'occur-check {:ty1 ty2 :ty2 ty1}])
               (compose-subst si {ty2 ty1}) :as [_ si]
-              (aux (map (fn [[x y]]
-                          [(apply-subst-ty si x) (apply-subst-ty si y)])
-                        (rest tys)) si))
+              (aux (rest tys) si))
 
-             ;; ty1 and ty2 are arrow types or applied constructors
-             (and (syn/applied-type-constructor? ty1) (syn/applied-type-constructor? ty2)
-                  (= (first ty1) (first ty2)))
-             (let [ty1 (syn/flatten-arrow ty1)
-                   ty2 (syn/flatten-arrow ty2)
-                   [ty1 ty2]
+             ;; ty1 and ty2 are arrow types
+             (and (syn/arrow-type? ty1) (syn/arrow-type? ty2))
+             (let [[ty1 ty2]
                    (cond
                      (< (count ty1) (count ty2))
                      [ty1 (syn/curry-arrow ty2 (- (count ty2) (count ty1)))]
                      (> (count ty1) (count ty2))
                      [(syn/curry-arrow ty1 (- (count ty1) (count ty2))) ty2]
                      :else [ty1 ty2])]
-               (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2)) (rest tys)) si))
+               (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2))
+                              (rest tys)) si))
+
+             ;; ty1 and ty2 are applied type constructors
+             (and (syn/applied-type-constructor? ty1)
+                  (syn/applied-type-constructor? ty2)
+                  (= (first ty1) (first ty1)) (= (count ty1) (count ty2)))
+             (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2))
+                            (rest tys)) si)
 
              ;; Types are not unifiable
              :else [:ko 'not-unifiable {:ty1 ty1 :ty2 ty2}]
@@ -231,7 +234,7 @@
 (examples
  (infer-term '+) => [:ok '(-> i i i)]
  (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty1)]
- (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 (-> Ty2 Ty2))]
+ (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 Ty2 Ty2)]
  (infer-term '((λ 1 #{0}) (S O))) => [:ok 'i])
 
 (defn apply-subst-metadata
@@ -240,11 +243,12 @@
   (cond
     (syn/lambda? t)
     (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
-      {:ty (apply-subst-ty si (get (meta t) :ty))})
+      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
     (syn/application? t)
     (with-meta (map (fn [t] (apply-subst-metadata si t)) t)
-      {:ty (apply-subst-ty si (get (meta t) :ty))})
-    :else (vary-meta t (fn [me] {:ty (apply-subst-ty si (get me :ty))}))
+      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
+    :else (vary-meta t (fn [me] {:ty (syn/normalize-ty
+                                     (apply-subst-ty si (get me :ty)))}))
     ))
 
 (defn elaborate-term
@@ -268,14 +272,7 @@
 
 (defn type-of
   "Retrieve type information for an elaborated term `t`"
-  [t] (cond
-        (syn/bound? t) (get (meta t) :ty)
-        (syn/free? t) (get (meta t) :ty)
-        (syn/primitive? t) (get (meta t) :ty)
-        (syn/application? t) (get (meta t) :ty)
-        (syn/lambda? t) (get (meta t) :ty)
-        (syn/suspension? t) (type-of (first t))))
-
+  [t] (get (meta t) :ty))
 
 (defn apply-subst-env
   "Apply the type substitution `si` in the environment `e`"
@@ -309,8 +306,8 @@
       ;; The head is a user-defined predicate
       (syn/user-const? (first p))
       [(if (contains? prog (first p))
-         (first (get prog (first p)))
-         [:ko 'predicate-not-found {:pred (first p)}]) cnt]
+         (rename-type-vars cnt (first (get prog (first p))))
+         [:ko 'predicate-not-found {:pred (first p)}]) (inc cnt)]
       ;; The head is a free variable
       (syn/free? (first p))
       [(cons '-> (concat
@@ -320,10 +317,12 @@
     (syn/destruct-arrow ty (count (rest p))) :as [params res]
     (when (not= res 'o)
       [:ko 'wrong-ret-type-for-predicate {:pred (first p) :ret-ty res}])
-    (u/ok-reduce (fn [[res cnt] [t ty]]
-                   (ok> (check-and-elaborate-term consts t ty cnt) :as [_ t cnt]
-                        [:ok [(cons t res) cnt]]))
-                 ['() cnt] (map vector (rest p) params)) :as [_ [tl cnt]]
+    (u/ok-reduce
+     (fn [[res cnt] [t ty]]
+       (ok> (u/map-of-pair-list (map (fn [[x [ty _]]] [x ty]) prog)) :as prog
+            (check-and-elaborate-term (conj prog consts) t ty cnt) :as [_ t cnt]
+            [:ok [(cons t res) cnt]]))
+     ['() cnt] (map vector (rest p) params)) :as [_ [tl cnt]]
     [:ko> 'elaborate-pred {:pred p}]
     [:ok (cons (with-meta (first p) {:ty ty}) (reverse tl)) cnt])))
 
@@ -405,7 +404,7 @@
         (fn [[pred [ty clauses]]]
           (ok> (u/ok-map (fn [c] (elaborate-clause consts prog c))
                          clauses) :as [_ clauses]
-               [:ok [pred [ty (u/map-of-pair-list (map (fn [[t]] t) clauses))]]]))
+               [:ok [pred [ty (map (fn [[t]] t) clauses)]]]))
         prog) :as [_ prog]
        [:ok (u/map-of-pair-list (map (fn [[c]] c) prog))]))
 
