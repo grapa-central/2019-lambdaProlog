@@ -37,8 +37,6 @@
 (lp/defpred 'grandparent '(-> person person o))
 (lp/addclause '((grandparent X Z) :- (parent X Y), (parent Y Z)))
 
-(lp/type-check-program)
-
 ;; A few requests
 (lp/solve '(parent gomez Y)) ;; => [:ok {Y pugsley}]
 (lp/solve '(parents X Y wednesday)) ;; => [:ok {X gomez Y morticia}]

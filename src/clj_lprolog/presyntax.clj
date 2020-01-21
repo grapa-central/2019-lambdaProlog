@@ -201,87 +201,21 @@
              (u/ok-map parse-applied-pred (rest c))
              (u/ok-map parse-applied-pred (nthrest c 2))) :as [_ tl]
            [:ko> 'parsing-clause {:clause c}]
-           [:ok (cons hd (map (fn [[t]] t) tl))]))
-
-;; Contains the set of user types during execution of the program
-(def progtypes (atom #{}))
-;; Contains the set of constants (and their types) during execution of the program
-(def progconsts (atom {}))
-;; Contains the set of predicates during execution of the program
-(def progpreds (atom {}))
-
-(defn verify-previous-declarations
-  "Verify that the program defined by the previous declarations was correct"
-  [] (ok> (deref progtypes) :as _
-          (deref progconsts) :as _
-          (deref progpreds) :as _))
+           [:ok [hd (map (fn [[t]] t) tl)]]))
 
 (defn user-type-dec?
   "Is `ty` a well-formed type definition"
   [ty] (or (syn/user-type? ty)
-           (and (syn/applied-type-constructor? ty) (every? syn/type-var? (rest ty)))))
+           (and (syn/applied-type-constructor? ty)
+                (every? syn/type-var? (rest ty)))))
 
 (examples
  (user-type-dec? 'nat) => true
  (user-type-dec? '(list A)) => true)
 
-(defn deftype-fun
-  [ty] (ok> (verify-previous-declarations) :as _
-            (if (user-type-dec? ty)
-              (swap! progtypes (fn [pt] (conj pt ty)))
-              (swap! progtypes (fn [_] [:ko 'deftype {:ty ty}])))))
+(defn user-const-dec?
+  "Is `c` a well formed constant declaration with type `ty`"
+  [c ty] (and (symbol? c) (= (symbol (str/lower-case c)) c)
+              (proper-type? ty)))
 
-(defmacro deftype
-  "Define a type. `n` is the name of the type, it should be lowercase"
-  [ty] `(deftype-fun ~ty))
-
-(defn defconst-fun
-  [n ty] (ok> (verify-previous-declarations) :as _
-              (if (and (symbol? n)
-                       (= (symbol (str/lower-case n)) n)
-                       (proper-type? ty))
-                (swap! progconsts (fn [pc] (assoc pc n ty)))
-                (swap! progconsts (fn [_] [:ko 'defconst {:n n :ty ty}])))))
-
-(defmacro defconst
-  "Define a constant `n` (should be lowercase),
-  with its type `ty`. Checks well formedness"
-  [n ty] `(defconst-fun ~n ~ty))
-
-(defn defpred-fun
-  [n ty] (ok> (verify-previous-declarations) :as _
-              (if (and (pred? n) (proper-type? ty))
-                (swap! progpreds (fn [pp] (assoc pp n [ty '()])))
-                (swap! progpreds (fn [_] [:ko 'defpred {:n n :ty ty}])))))
-
-(defmacro defpred
-  "Define a predicate. `n` is the name of the predicate, and `t` its type
-  Also check well-formedness"
-  [n ty] `(defpred-fun ~n ~ty))
-
-(defn addclause-fun
-  [clause]
-  (ok> (verify-previous-declarations) :as _
-       (let [clause (parse-clause clause)]
-         (if (u/ko-expr? clause)
-           (swap! progpreds (fn [_] [:ko 'addclause {:cause clause}]))
-           (ok> (first (second clause)) :as head
-                (rest (second clause)) :as body
-                (swap! progpreds
-                       (fn [pp]
-                         (if-let [prev (get @progpreds (first head))]
-                           (assoc pp (first head)
-                                  (list (first prev)
-                                        (concat (second prev)
-                                                (list [head body]))))))))))))
-
-(defmacro addclause
-  "Add `clause` to a predicate.
-   Also checks that the clause is well formed"
-  [clause] `(addclause-fun ~clause))
-
-(defn start
-  "Reset the program environment"
-  [] (do (swap! progtypes (fn [_] #{}))
-         (swap! progconsts (fn [_] {}))
-         (swap! progpreds (fn [_] {}))))
+(example (user-const-dec? 'ni '(list A)) => true)

@@ -2,6 +2,7 @@
   (:require [clj-lprolog.utils :as u]
             [clj-lprolog.typecheck :as typ]
             [clj-lprolog.presyntax :as syn]
+            [clj-lprolog.core :as cor]
             [clojure.test :as t]))
 
 (t/deftest substitute-ty-test
@@ -96,74 +97,74 @@
 (t/deftest check-pred-test
   (t/testing "even"
     (do
-      (syn/start)
-      (syn/defpred 'even '(-> i o))
+      (cor/start)
+      (cor/defpred 'even '(-> i o))
       (t/is (= {'A 'i}
                (nth
                 (typ/elaborate-and-freevar-pred
-                 {} (deref syn/progpreds) '(even A)) 2)))))
+                 {} (deref cor/progpreds) '(even A)) 2)))))
   (t/testing "predicate"
     (do
-      (syn/start)
-      (syn/defpred 'pred '(-> (-> i o) i o))
+      (cor/start)
+      (cor/defpred 'pred '(-> (-> i o) i o))
       (t/is (= {'F 'o}
                (nth
                 (typ/elaborate-and-freevar-pred
-                 {} (deref syn/progpreds) '(pred (λ 1 F) (S O))) 2)))))
+                 {} (deref cor/progpreds) '(pred (λ 1 F) (S O))) 2)))))
   (t/testing "predicate fail"
     (do
-      (syn/start)
-      (syn/defpred 'pred '(-> (-> i o) i o))
+      (cor/start)
+      (cor/defpred 'pred '(-> (-> i o) i o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-pred
-              {} (deref syn/progpreds) '(pred (λ 1 F) F))))))
+              {} (deref cor/progpreds) '(pred (λ 1 F) F))))))
   (t/testing "used twice"
     (do
-      (syn/start)
-      (syn/defpred 'twice '(-> i i o))
+      (cor/start)
+      (cor/defpred 'twice '(-> i i o))
       (t/is (u/ok-expr?
              (typ/elaborate-and-freevar-pred
-              {} (deref syn/progpreds) '(twice ((λ 1 O) A) A)))))))
+              {} (deref cor/progpreds) '(twice ((λ 1 O) A) A)))))))
 
 (t/deftest check-clause-test
   (t/testing "oddeven"
     (do
-      (syn/start)
-      (syn/defpred 'even '(-> i o))
-      (syn/defpred 'odd '(-> i o))
+      (cor/start)
+      (cor/defpred 'even '(-> i o))
+      (cor/defpred 'odd '(-> i o))
       (t/is (= {'N 'i}
                (nth
                 (typ/elaborate-and-freevar-clause
-                 {} (deref syn/progpreds) '((even (S N)) ((odd N)))) 2)))))
+                 {} (deref cor/progpreds) '((even (S N)) ((odd N)))) 2)))))
   (t/testing "pred"
     (do
-      (syn/start)
-      (syn/defpred 'applypred '(-> (-> i o) i o))
+      (cor/start)
+      (cor/defpred 'applypred '(-> (-> i o) i o))
       (t/is (= {'P '(-> i o) 'N 'i}
                (nth
                 (typ/elaborate-and-freevar-clause
-                 {} (deref syn/progpreds) '((applypred P N) ((P N)))) 2)))))
+                 {} (deref cor/progpreds) '((applypred P N) ((P N)))) 2)))))
   (t/testing "incoherent"
     (do
-      (syn/start)
-      (syn/defpred 'even '(-> i o))
-      (syn/defpred 'odd '(-> o o))
+      (cor/start)
+      (cor/defpred 'even '(-> i o))
+      (cor/defpred 'odd '(-> o o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-clause
-              {} (deref syn/progpreds) '((even (S N)) ((odd N)))))))))
+              {} (deref cor/progpreds) '((even (S N)) ((odd N)))))))))
 
 (t/deftest elaborate-program-test
   (t/testing "oddeven"
     (do
-      (syn/start)
-      (syn/defpred 'even '(-> i o))
-      (syn/defpred 'odd '(-> i o))
-      (syn/addclause '((even O)))
-      (syn/addclause '((even (S N)) :- (odd N)))
-      (syn/addclause '((odd (S O))))
-      (syn/addclause '((odd (S N)) :- (even N)))
-      (t/is (= [:ok (deref syn/progpreds)]
-               (typ/elaborate-program {} (deref syn/progpreds)))))))
+      (cor/start)
+      (cor/defpred 'even '(-> i o))
+      (cor/defpred 'odd '(-> i o))
+      (cor/addclause '((even O)))
+      (cor/addclause '((even (S N)) :- (odd N)))
+      (cor/addclause '((odd (S O))))
+      (cor/addclause '((odd (S N)) :- (even N)))
+      (t/is (= [:ok (deref cor/progpreds)]
+               (typ/elaborate-program {} (deref cor/progpreds)))))))
 
 (t/deftest valid-type?-test
   (t/testing "positive"
@@ -176,12 +177,12 @@
 (t/deftest elaborate-and-check-program-test
   (t/testing "oddeven"
     (do
-      (syn/start)
-      (syn/defpred 'even '(-> i o))
-      (syn/defpred 'odd '(-> i o))
-      (syn/addclause '((even O)))
-      (syn/addclause '((even (S N)) :- (odd N)))
-      (syn/addclause '((odd (S O))))
-      (syn/addclause '((odd (S N)) :- (even N)))
-      (t/is (= [:ok (deref syn/progpreds)]
-               (typ/elaborate-and-check-program #{} {} (deref syn/progpreds)))))))
+      (cor/start)
+      (cor/defpred 'even '(-> i o))
+      (cor/defpred 'odd '(-> i o))
+      (cor/addclause '((even O)))
+      (cor/addclause '((even (S N)) :- (odd N)))
+      (cor/addclause '((odd (S O))))
+      (cor/addclause '((odd (S N)) :- (even N)))
+      (t/is (= [:ok (deref cor/progpreds)]
+               (typ/elaborate-and-check-program #{} {} (deref cor/progpreds)))))))

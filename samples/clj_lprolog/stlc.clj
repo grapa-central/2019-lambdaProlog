@@ -18,8 +18,6 @@
 (lp/addclause '((eval (abs R) (abs R))))
 (lp/addclause '((eval (app M N) V) :- (eval M (abs R)) (eval N U) (eval (R U) V)))
 
-(lp/type-check-program)
-
 ;; Some evaluation examples (from the TAS course)
 ;; This evaluator does not reduce under abstrations, so the results are not "tidy"
 (def DELTA '(abs (λ [x] (app x x))))

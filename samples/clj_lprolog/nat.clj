@@ -19,8 +19,6 @@
 ;; And only one for odd, using even
 (lp/addclause '((odd (succ N)) :- (even N)))
 
-(lp/type-check-program)
-
 ;; Example requests
 (lp/solve '(even (succ (succ zero)))) ;; => '[:ok {}]
 (lp/solve '(even (succ N))) ;; => '[:ok {N (succ zero)}]

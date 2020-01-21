@@ -23,8 +23,6 @@
 (lp/addclause '((mappred ni P ni)))
 (lp/addclause '((mappred (cs X L1) P (cs Y L2)) :- (P X Y), (mappred L1 P L2)))
 
-(lp/type-check-program)
-
 (lp/solve '(mapfun (cs zero ni) (λ [x] (succ x)) L))
 (lp/solve '(mapfun L (λ [x] (succ x)) (cs (succ zero) ni)))
 (lp/solve '(mapfun (cs zero ni) F (cs (succ zero) ni)))

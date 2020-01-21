@@ -427,22 +427,26 @@
 
 (example (valid-type? '#{bool} '(-> i bool)) => :ok)
 
+(defn check-const
+  "Check that the constant `c` use types declared in `types`"
+  [types [c ty]] (ok> (valid-type? types ty) :as _
+                      [:ko> 'check-const {:const c :ty ty}]))
+
 (defn check-consts
   "Check that all `consts` use types declared in `types`"
-  [types consts] (u/every-ok?
-                  (fn [[c ty]] (ok> (valid-type? types ty) :as _
-                                   [:ko> 'check-consts {:const c :ty ty}]))
-                  consts))
+  [types consts] (u/every-ok? (fn [c] (check-const types c)) consts))
+
+(defn check-pred
+  "Check that `p` uses types declared in `types`"
+  [types [p [ty _]]] (ok> (valid-type? types ty) :as _
+                          [:ko> 'check-pred {:pred p :ty ty}]
+                          (when (not (syn/prop-type? (syn/return-type ty)))
+                            [:ko 'check-pred {:pred p :ty ty}])
+                          :ok))
 
 (defn check-preds
-  "Check that all preds in `prog` use types declared in `types`"
-  [types prog]
-  (u/every-ok?
-   (fn [[p [ty _]]] (ok> (valid-type? types ty) :as _
-                        [:ko> 'check-preds {:pred p :ty ty}]
-                        (when (not (syn/prop-type? (syn/return-type ty)))
-                          [:ko 'check-preds {:pred p :ty ty}])
-                        :ok)) prog))
+  "Check that all preds in `prog` uses types declared in `types`"
+  [types prog] (u/every-ok? (fn [p] (check-pred types p)) prog))
 
 (defn elaborate-and-check-program
   "Check and elaborate `prog`, and check that the use of freevars is coherent"
