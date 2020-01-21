@@ -205,6 +205,16 @@
 
 ;; Contains the set of user types during execution of the program
 (def progtypes (atom #{}))
+;; Contains the set of constants (and their types) during execution of the program
+(def progconsts (atom {}))
+;; Contains the set of predicates during execution of the program
+(def progpreds (atom {}))
+
+(defn verify-previous-declarations
+  "Verify that the program defined by the previous declarations was correct"
+  [] (ok> (deref progtypes) :as _
+          (deref progconsts) :as _
+          (deref progpreds) :as _))
 
 (defn user-type-dec?
   "Is `ty` a well-formed type definition"
@@ -215,49 +225,60 @@
  (user-type-dec? 'nat) => true
  (user-type-dec? '(list A)) => true)
 
+(defn deftype-fun
+  [ty] (ok> (verify-previous-declarations) :as _
+            (if (user-type-dec? ty)
+              (swap! progtypes (fn [pt] (conj pt ty)))
+              (swap! progtypes (fn [_] [:ko 'deftype {:ty ty}])))))
+
 (defmacro deftype
   "Define a type. `n` is the name of the type, it should be lowercase"
-  [ty] `(if (user-type-dec? ~ty)
-          (swap! progtypes (fn [pt#] (conj pt# ~ty)))
-          [:ko 'deftype {:n ~ty}]))
+  [ty] `(deftype-fun ~ty))
 
-;; Contains the set of constants (and their types) during execution of the program
-(def progconsts (atom {}))
+(defn defconst-fun
+  [n ty] (ok> (verify-previous-declarations) :as _
+              (if (and (symbol? n)
+                       (= (symbol (str/lower-case n)) n)
+                       (proper-type? ty))
+                (swap! progconsts (fn [pc] (assoc pc n ty)))
+                (swap! progconsts (fn [_] [:ko 'defconst {:n n :ty ty}])))))
 
 (defmacro defconst
   "Define a constant `n` (should be lowercase),
   with its type `ty`. Checks well formedness"
-  [n ty] `(if (and (symbol? ~n) (= (symbol (str/lower-case ~n)) ~n)
-                   (proper-type? ~ty))
-            (swap! progconsts (fn [pc#] (assoc pc# ~n ~ty)))
-            [:ko 'defconst {:n ~n :ty ~ty}]))
+  [n ty] `(defconst-fun ~n ~ty))
 
-;; Contains the set of predicates during execution of the program
-(def progpreds (atom {}))
+(defn defpred-fun
+  [n ty] (ok> (verify-previous-declarations) :as _
+              (if (and (pred? n) (proper-type? ty))
+                (swap! progpreds (fn [pp] (assoc pp n [ty '()])))
+                (swap! progpreds (fn [_] [:ko 'defpred {:n n :ty ty}])))))
 
 (defmacro defpred
   "Define a predicate. `n` is the name of the predicate, and `t` its type
   Also check well-formedness"
-  [n t]
-  `(if (and (pred? ~n) (proper-type? ~t))
-     (swap! progpreds (fn [pp#] (assoc pp# ~n [~t '()])))
-  [:ko 'defpred {:n ~n :t ~t}]))
+  [n ty] `(defpred-fun ~n ~ty))
+
+(defn addclause-fun
+  [clause]
+  (ok> (verify-previous-declarations) :as _
+       (let [clause (parse-clause clause)]
+         (if (u/ko-expr? clause)
+           (swap! progpreds (fn [_] [:ko 'addclause {:cause clause}]))
+           (ok> (first (second clause)) :as head
+                (rest (second clause)) :as body
+                (swap! progpreds
+                       (fn [pp]
+                         (if-let [prev (get @progpreds (first head))]
+                           (assoc pp (first head)
+                                  (list (first prev)
+                                        (concat (second prev)
+                                                (list [head body]))))))))))))
 
 (defmacro addclause
   "Add `clause` to a predicate.
    Also checks that the clause is well formed"
-  [clause]
-  `(let [clause# (parse-clause ~clause)]
-     (if (u/ko-expr? clause#) [:ko 'addclause {:cause clause#}]
-         (let [head# (first (second clause#))
-               body# (rest (second clause#))]
-           (swap! progpreds
-                  (fn [pp#]
-                    (if-let [prev# (get @progpreds (first head#))]
-                      (assoc pp# (first head#)
-                             (list (first prev#)
-                                   (concat (second prev#)
-                                           (list [head# body#])))))))))))
+  [clause] `(addclause-fun ~clause))
 
 (defn start
   "Reset the program environment"

@@ -17,14 +17,16 @@
 
 (defn type-check-program
   "Type check the current program"
-  [] (typ/type-check-program
-      (deref syn/progtypes)
-      (deref syn/progconsts)
-      (deref syn/progpreds)))
+  [] (u/ok> (syn/verify-previous-declarations) :as _
+            (typ/type-check-program
+             (deref syn/progtypes)
+             (deref syn/progconsts)
+             (deref syn/progpreds))))
 
 (defn solve
   "Solve the request `req`"
   [req] (u/ok>
+         (syn/verify-previous-declarations) :as _
          (syn/parse-applied-pred req) :as [_ req]
          [:ko> 'parse-request {:req req}]
          (typ/elaborate-and-freevar-pred
