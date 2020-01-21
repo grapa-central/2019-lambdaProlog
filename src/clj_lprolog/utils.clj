@@ -1,5 +1,4 @@
-(ns clj-lprolog.utils
-  (:require [clj-lprolog.utils :as u]))
+(ns clj-lprolog.utils)
 
 ;; Taken from https://gitlab.com/fredokun/deputy/blob/master/src/deputy/utils.clj
 
