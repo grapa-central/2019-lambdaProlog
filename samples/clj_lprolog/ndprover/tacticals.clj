@@ -18,7 +18,11 @@
                 (maptac Tac Ingoal2, Outgoal2),
                 (goalreduce (andgoal Outgoal1 Outgoal2) Outgoal)))
 
-;;add clause with pi
+;;this clause may need some work, see teyjus
+(lp/addclause '((maptac Tac (allgoal Ingoal) Outgoal) :-
+                (λ [t] (maptac Tac (Ingoal t) (Outgoal1 t))),
+                (goalreduce (allgoal Outgoal1) Outgoal)))
+
 
 (lp/addclause '((maptac Tac Ingoal Outgoal) :-
                 (Tac Ingoal Outgoal)))
