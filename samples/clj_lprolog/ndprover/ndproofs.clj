@@ -17,6 +17,3 @@
 (lp/defconst 'forall-e '(-> j proof-object proof-object))
 (lp/defconst 'or-e '(-> proof-object (-> proof-object proof-object) (-> proof-object proof-object) proof-object))
 (lp/defconst 'exists-e '(-> proof-object (-> j proof-object proof-object) proof-object))
-
-(lp/type-check-program)
-

@@ -16,5 +16,3 @@
 (lp/defconst 'heated '(-> j bool))
 
 (lp/defconst 'in '(-> j j bool))
-
-(lp/type-check-program)

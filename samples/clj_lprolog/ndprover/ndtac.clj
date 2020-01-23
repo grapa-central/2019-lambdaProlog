@@ -3,11 +3,10 @@
 
 ;; (lp/start)
 
-(load-file "samples/clj_lprolog/nat.clj")
+(load-file "samples/clj_lprolog/ndprover/listmanip.clj")
 (load-file "samples/clj_lprolog/ndprover/goaltypes.clj")
 (load-file "samples/clj_lprolog/ndprover/logic.clj")
 (load-file "samples/clj_lprolog/ndprover/ndproofs.clj")
-(load-file "samples/clj_lprolog/ndprover/listmanip.clj")
 
 (lp/deftype 'judgment)
 (lp/deftype 'answer)
@@ -126,5 +125,3 @@
                                                       (--> (cs (of-type pa (A t)) Gamma1)
                                                            (of-type (Pc t pa) C))))))) :-
                 (nth-item-and-rest N (of-type P (some A)) Gamma Gamma1)))
-
-;; (lp/type-check-program)
