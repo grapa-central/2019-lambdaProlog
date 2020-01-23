@@ -108,12 +108,14 @@
 
              ;; ty1 and ty2 are arrow types
              (and (syn/arrow-type? ty1) (syn/arrow-type? ty2))
-             (let [[ty1 ty2]
+             (let [n1 (dec (count ty1))
+                   n2 (dec (count ty2))
+                   [ty1 ty2]
                    (cond
-                     (< (count ty1) (count ty2))
-                     [ty1 (syn/curry-arrow ty2 (- (count ty2) (count ty1)))]
-                     (> (count ty1) (count ty2))
-                     [(syn/curry-arrow ty1 (- (count ty1) (count ty2))) ty2]
+                     (< n1 n2)
+                     [ty1 (syn/curry-arrow ty2 (dec n1))]
+                     (> n1 n2)
+                     [(syn/curry-arrow ty1 (dec n2)) ty2]
                      :else [ty1 ty2])]
                (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2))
                               (rest tys)) si))

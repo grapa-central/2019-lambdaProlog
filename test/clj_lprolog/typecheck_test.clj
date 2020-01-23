@@ -25,7 +25,9 @@
              (typ/mgu-ty '(-> a b c) '(-> Ty1 Ty2) )))
     (t/is (= [:ok {'Ty1 'a}] (typ/mgu-ty 'a '(-> Ty1))))
     (t/is (= [:ok {'Ty1 'nat}]
-             (typ/mgu-ty '(list nat) '(list Ty1)))))
+             (typ/mgu-ty '(list nat) '(list Ty1))))
+    (t/is (= '[:ok {Ty1 (-> goal goal o) Ty2 (-> goal goal o)}]
+           (typ/mgu-ty '(-> (-> goal goal o) goal goal o) '(-> Ty1 Ty2)))))
   (t/testing "negative"
     (t/is (u/ko-expr? (typ/mgu-ty 'a 'b)))
     (t/is (u/ko-expr? (typ/mgu-ty '(-> Ty1 Ty1) '(-> a b))))
@@ -38,6 +40,9 @@
   (t/is (= 'i (typ/rename-type-vars 18 'i)))
   (t/is (= '(pair TyA0 TyB0) (typ/rename-type-vars 0 '(pair A B)))))
 
+(def tacconsts '{then (-> (-> goal goal o) (-> goal goal o) goal goal o)
+                 repeattac (-> (-> goal goal o) goal goal o)})
+
 (t/deftest infer-term-test
   (t/testing "positive"
     (t/is (u/ok-expr? (typ/subst-infer-term {} #{0} ['i] 0)))
@@ -49,7 +54,10 @@
     (t/is (u/ok-expr? (typ/infer-term '(λ 2 #{1}))))
     (t/is (u/ok-expr? (typ/infer-term '((λ 2 #{1}) O))))
     (t/is (= [:ok '(-> i i)] (typ/infer-term '((λ 2 (+ #{0} #{1})) O))))
-    (t/is (= [:ok 'i] (typ/infer-term '(λ 0 (S O))))))
+    (t/is (= [:ok 'i] (typ/infer-term '(λ 0 (S O)))))
+    (t/is (= [:ok '(-> goal goal o)] (typ/infer-term tacconsts '(repeattac Tac))))
+    (t/is (= [:ok '(-> goal goal o)]
+             (typ/infer-term tacconsts '(then Tac (repeattac Tac))))))
   (t/testing "negative"
     (t/is (u/ko-expr? (typ/infer-term '(S S))))
     (t/is (u/ko-expr? (typ/infer-term '((λ 1 (+ #{0} #{0})) S))))))
