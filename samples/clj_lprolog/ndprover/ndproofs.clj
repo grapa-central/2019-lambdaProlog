@@ -13,7 +13,7 @@
 (lp/defconst 'exists-i '(-> j proof-object proof-object))
 (lp/defconst 'and-e1 '(-> proof-object proof-object))
 (lp/defconst 'and-e2 '(-> proof-object proof-object))
-(lp/defconst 'imp-e '(-> j proof-object proof-object))
+(lp/defconst 'imp-e '(-> proof-object proof-object proof-object))
 (lp/defconst 'forall-e '(-> j proof-object proof-object))
 (lp/defconst 'or-e '(-> proof-object (-> proof-object proof-object) (-> proof-object proof-object) proof-object))
 (lp/defconst 'exists-e '(-> proof-object (-> j proof-object proof-object) proof-object))
