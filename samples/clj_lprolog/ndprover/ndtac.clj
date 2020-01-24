@@ -72,29 +72,28 @@
                                 (of-type Pc C))) :-
                 (nth-item-and-rest N (of-type P (and A B)) Gamma Gamma1)))
 
-;; TYPE CHECK
-;; (lp/addclause '((imp-e-tac N
-;;                            (--> Gamma (of-type Pc C))
-;;                            (andgoal (--> Gamma1 (of-type Pa A))
-;;                                     (--> (cs (of-type (imp-e Pa P) B) Gamma1) (of-type Pc C)))) :-
-;;                 (nth-item-and-rest N (of-type P (imp A B)) Gamma Gamma1)))
+(lp/addclause '((imp-e-tac N
+                           (--> Gamma (of-type Pc C))
+                           (andgoal (--> Gamma1 (of-type Pa A))
+                                    (--> (cs (of-type (imp-e Pa P) B) Gamma1) (of-type Pc C)))) :-
+                (nth-item-and-rest N (of-type P (imp A B)) Gamma Gamma1)))
 
-;; (lp/addclause '((imp-e-retain N
-;;                               (--> Gamma (of-type Pc C))
-;;                               (andgoal (--> Gamma (of-type Pa A))
-;;                                        (--> (cs (of-type (imp-e Pa P) B) Gamma) (of-type Pc C)))) :-
-;;                 (nth-item N (of-type P (imp A B)) Gamma)))
+(lp/addclause '((imp-e-retain N
+                              (--> Gamma (of-type Pc C))
+                              (andgoal (--> Gamma (of-type Pa A))
+                                       (--> (cs (of-type (imp-e Pa P) B) Gamma) (of-type Pc C)))) :-
+                (nth-item N (of-type P (imp A B)) Gamma)))
 
-;; (lp/addclause '((bchain-tac N
-;;                             (--> Gamma (of-type (imp-e Pa P) B))
-;;                             (--> Gamma1 (of-type Pa A))) :-
-;;                 (nth-item-and-rest N (of-type P (imp A B)) Gamma Gamma1)))
+(lp/addclause '((bchain-tac N
+                            (--> Gamma (of-type (imp-e Pa P) B))
+                            (--> Gamma1 (of-type Pa A))) :-
+                (nth-item-and-rest N (of-type P (imp A B)) Gamma Gamma1)))
 
-;; (lp/addclause '((fchain-tac N
-;;                             (--> Gamma (of-type Pc C))
-;;                             (--> (cs (of-type (imp-e Pa P) B) Gamma2) (of-type Pc C))) :-
-;;                 (nth-item-and-rest N (of-type P (imp A B)) Gamma Gamma1),
-;;                 (member-and-rest (of-type Pa A) Gamma1 Gamma2)))
+(lp/addclause '((fchain-tac N
+                            (--> Gamma (of-type Pc C))
+                            (--> (cs (of-type (imp-e Pa P) B) Gamma2) (of-type Pc C))) :-
+                (nth-item-and-rest N (of-type P (imp A B)) Gamma Gamma1),
+                (member-and-rest (of-type Pa A) Gamma1 Gamma2)))
 
 (lp/addclause '((forall-e-tac N
                               (--> Gamma (of-type Pc C))
@@ -125,3 +124,5 @@
                                                       (--> (cs (of-type pa (A t)) Gamma1)
                                                            (of-type (Pc t pa) C))))))) :-
                 (nth-item-and-rest N (of-type P (some A)) Gamma Gamma1)))
+
+;; (lp/type-check-program)
