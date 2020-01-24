@@ -12,37 +12,30 @@
 ;; Contains the set of predicates during execution of the program
 (def progpreds (atom {}))
 
+;; Reset the program if needed
 (defn start
   "Reset the program environment"
   [] (do (swap! progtypes (fn [_] #{}))
          (swap! progconsts (fn [_] {}))
          (swap! progpreds (fn [_] {}))))
 
-(defn verify-previous-declarations
-  "Verify that the program defined by the previous declarations was correct"
-  [] (ok> (deref progtypes) :as _
-          (deref progconsts) :as _
-          (deref progpreds) :as _))
-
 ;; Declaration macros, and the functions they use
 (defn deftype-fun
-  [ty] (ok> (verify-previous-declarations) :as _
-            (if (syn/user-type-dec? ty)
-              (swap! progtypes (fn [pt] (conj pt ty)))
-              (swap! progtypes (fn [_] [:ko 'deftype {:ty ty}])))))
+  [ty] (if (syn/user-type-dec? ty)
+         (swap! progtypes (fn [pt] (conj pt ty)))
+         (throw (ex-info (str 'deftype) {:ty ty}))))
 
 (defmacro deftype
   "Define a type. `n` is the name of the type, it should be lowercase"
   [ty] `(deftype-fun ~ty))
 
 (defn defconst-fun
-  [c ty] (ok> (verify-previous-declarations) :as _
-              (if (syn/user-const-dec? c ty)
-                (swap! progconsts
-                       (fn [pc] (ok> (typ/check-const @progtypes [c ty])
-                                    [:ko> 'defconst {:c c :ty ty}]
-                                    (assoc pc c ty))))
-                (swap! progconsts (fn [_] [:ko 'defconst {:c c :ty ty}])))))
+  [c ty] (if (syn/user-const-dec? c ty)
+           (let [check (typ/check-const @progtypes [c ty])]
+             (if (u/ko-expr? check)
+               (throw (ex-info (str (second check)) (nth check 2)))
+               (swap! progconsts (fn [pc] (assoc pc c ty)))))
+           (throw (ex-info (str 'defconst) {:const c :ty ty}))))
 
 (defmacro defconst
   "Define a constant `n` (should be lowercase),
@@ -50,13 +43,12 @@
   [c ty] `(defconst-fun ~c ~ty))
 
 (defn defpred-fun
-  [p ty] (ok> (verify-previous-declarations) :as _
-              (if (and (syn/pred? p) (syn/proper-type? ty))
-                (swap! progpreds
-                       (fn [pp] (ok> (typ/check-pred @progtypes [p [ty '()]])
-                                    [:ko> 'defpred {:p p :ty ty}]
-                                    (assoc pp p [ty '()]))))
-                (swap! progpreds (fn [_] [:ko 'defpred {:p p :ty ty}])))))
+  [p ty] (if (and (syn/pred? p) (syn/proper-type? ty))
+           (let [check (typ/check-pred @progtypes [p [ty '()]])]
+             (if (u/ko-expr? check)
+               (throw (ex-info (str (second check)) (nth check 2)))
+               (swap! progpreds (fn [pp] (assoc pp p [ty '()])))))
+           (throw (ex-info (str 'defpred) {:pred p :ty ty}))))
 
 (defmacro defpred
   "Define a predicate. `n` is the name of the predicate, and `t` its type
@@ -65,19 +57,20 @@
 
 (defn addclause-fun
   [clause]
-  (ok> (verify-previous-declarations) :as _
-       (swap! progpreds
-              (fn [pp]
-                (ok> (syn/parse-clause clause) :as [_ clause]
-                     (get @progpreds (ffirst clause)) :as prev
-                     (when (nil? prev) [:ko 'addclause {:clause clause}])
-                     (typ/elaborate-and-freevar-clause
-                      @progconsts @progpreds clause) :as [_ clause]
-                     [:ko 'addclause {:clause clause}]
-                     (assoc pp (first (first clause))
-                            (list (first prev)
-                                  (concat (second prev) (list clause))))
-                     )))))
+  (let [clause (syn/parse-clause clause)]
+    (if (u/ko-expr? clause)
+      (throw (ex-info (str (second clause)) (nth clause 2)))
+      (let [clause (typ/elaborate-and-freevar-clause
+                    @progconsts @progpreds (second clause))]
+        (if (u/ko-expr? clause)
+          (throw (ex-info (str (second clause)) (nth clause 2)))
+          (swap! progpreds
+                  (fn [pp]
+                    (let [prev (get @progpreds (ffirst (second clause)))]
+                      (assoc pp (first (first (second clause)))
+                             (list (first prev)
+                                   (concat (second prev) (list (second clause))))))
+                     )))))))
 
 (defmacro addclause
   "Add `clause` to a predicate.
@@ -86,16 +79,14 @@
 
 (defn type-check-program
   "Type check the current program"
-  [] (u/ok> (verify-previous-declarations) :as _
-            (typ/type-check-program
-             (deref progtypes)
-             (deref progconsts)
-             (deref progpreds))))
+  [] (typ/type-check-program
+      (deref progtypes)
+      (deref progconsts)
+      (deref progpreds)))
 
 (defn solve
   "Solve the request `req`"
   [req] (u/ok>
-         (verify-previous-declarations) :as _
          (syn/parse-applied-pred req) :as [_ req]
          [:ko> 'parse-request {:req req}]
          (typ/elaborate-and-freevar-pred

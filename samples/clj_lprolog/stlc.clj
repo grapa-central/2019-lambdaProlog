@@ -2,7 +2,6 @@
   (:require [clj-lprolog.core :as lp]))
 
 ;; Simply-Typed-Lambda-Calculus
-(lp/start)
 
 ;; The terms are based on λProlog user terms
 (lp/deftype 'term)

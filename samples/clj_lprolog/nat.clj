@@ -1,8 +1,6 @@
 (ns clj-lprolog.nat
   (:require [clj-lprolog.core :as lp]))
 
-(lp/start)
-
 (lp/deftype 'nat)
 (lp/defconst 'zero 'nat)
 (lp/defconst 'succ '(-> nat nat))

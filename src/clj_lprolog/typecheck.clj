@@ -332,12 +332,12 @@
   "Elaborate terms of a clause `c`"
   [consts prog c]
   (ok> (elaborate-pred consts prog (first c) 0) :as [_ hd cnt]
-       [:ko> 'elaborate-clause {:c c}]
+       [:ko> 'elaborate-clause {:clause c}]
        (u/ok-reduce (fn [[res cnt] t]
                       (ok> (elaborate-pred consts prog t cnt) :as [_ t cnt]
                            [:ok [(cons t res) cnt]]))
                     ['() cnt] (second c)) :as [_ [tl cnt]]
-       [:ko> 'elaborate-clause {:c c}]
+       [:ko> 'elaborate-clause {:clause c}]
        [:ok [hd (reverse tl)]]))
 
 (defn get-freevar-types
@@ -363,7 +363,7 @@
                                (combine-env e1 e2)))
                 (if (syn/free? (first t)) {(first t) ty} {})
                 (rest t))
-   [:ko> 'check-freevar-pred {:p t}]
+   [:ko> 'check-freevar-pred {:pred t}]
    ))
 
 (defn elaborate-and-freevar-pred
@@ -382,11 +382,11 @@
   "Check and get freevar types for an elaborated clause `c`"
   [prog c]
   (ok> (check-freevar-pred (first c)) :as [_ fvt]
-       [:ko> 'check-freevar-clause {:c c}]
+       [:ko> 'check-freevar-clause {:clause c}]
        (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred t) :as [_ e2]
                                    (combine-env e1 e2)))
                     fvt (second c))
-       [:ko> 'check-freevar-clause {:c c :fvt fvt}]))
+       [:ko> 'check-freevar-clause {:clause c :fvt fvt}]))
 
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"

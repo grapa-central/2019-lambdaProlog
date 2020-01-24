@@ -5,8 +5,6 @@
 ;; A classic knowledge-base example about family
 ;;}
 
-(lp/start)
-
 (lp/deftype 'person)
 (lp/defconst 'gomez 'person)
 (lp/defconst 'morticia 'person)
