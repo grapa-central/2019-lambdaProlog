@@ -23,7 +23,14 @@
 (lp/addclause '((mappred ni P ni)))
 (lp/addclause '((mappred (cs X L1) P (cs Y L2)) :- (P X Y), (mappred L1 P L2)))
 
+(lp/defpred 'sup '(-> nat nat o))
+(lp/addclause '((sup (succ C) (succ D)) :- (sup C D)))
+(lp/addclause '((sup (succ C) zero)))
+
 (lp/solve '(mapfun (cs zero ni) (λ [x] (succ x)) L))
 (lp/solve '(mapfun L (λ [x] (succ x)) (cs (succ zero) ni)))
 (lp/solve '(mapfun (cs zero ni) F (cs (succ zero) ni)))
 (lp/solve '(foreach (cs zero (cs (succ X) ni)) even))
+
+(lp/solve '(mappred (cs (succ zero) ni) sup L))
+(lp/type-check-program)
