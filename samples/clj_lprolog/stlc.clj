@@ -2,7 +2,6 @@
   (:require [clj-lprolog.core :as lp]))
 
 ;; Simply-Typed-Lambda-Calculus
-(lp/start)
 
 ;; The terms are based on λProlog user terms
 (lp/deftype 'term)
@@ -17,8 +16,6 @@
 (lp/addclause '((eval fl fl)))
 (lp/addclause '((eval (abs R) (abs R))))
 (lp/addclause '((eval (app M N) V) :- (eval M (abs R)) (eval N U) (eval (R U) V)))
-
-(lp/type-check-program)
 
 ;; Some evaluation examples (from the TAS course)
 ;; This evaluator does not reduce under abstrations, so the results are not "tidy"

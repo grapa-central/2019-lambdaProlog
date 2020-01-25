@@ -104,6 +104,9 @@
   (t/is (= ['(A) '(-> B C)] (syn/destruct-arrow '(-> A B C) 1)))
   (t/is (= ['(A B C) '(-> D E)] (syn/destruct-arrow '(-> A B C D E) 3))))
 
+(t/deftest curry-arrow-test
+  (t/is (= '(-> A B (-> C D E)) (syn/curry-arrow '(-> A B C D E) 2))))
+
 (t/deftest flatten-arrow-test
   (t/is (= 'A (syn/flatten-arrow 'A)))
   (t/is (= '(-> A B C) (syn/flatten-arrow '(-> A (-> B C)))))

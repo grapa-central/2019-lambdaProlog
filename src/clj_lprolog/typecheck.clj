@@ -108,12 +108,14 @@
 
              ;; ty1 and ty2 are arrow types
              (and (syn/arrow-type? ty1) (syn/arrow-type? ty2))
-             (let [[ty1 ty2]
+             (let [n1 (dec (count ty1))
+                   n2 (dec (count ty2))
+                   [ty1 ty2]
                    (cond
-                     (< (count ty1) (count ty2))
-                     [ty1 (syn/curry-arrow ty2 (- (count ty2) (count ty1)))]
-                     (> (count ty1) (count ty2))
-                     [(syn/curry-arrow ty1 (- (count ty1) (count ty2))) ty2]
+                     (< n1 n2)
+                     [ty1 (syn/curry-arrow ty2 (dec n1))]
+                     (> n1 n2)
+                     [(syn/curry-arrow ty1 (dec n2)) ty2]
                      :else [ty1 ty2])]
                (recur (concat (rest (map (fn [x y] [x y]) ty1 ty2))
                               (rest tys)) si))
@@ -330,12 +332,12 @@
   "Elaborate terms of a clause `c`"
   [consts prog c]
   (ok> (elaborate-pred consts prog (first c) 0) :as [_ hd cnt]
-       [:ko> 'elaborate-clause {:c c}]
+       [:ko> 'elaborate-clause {:clause c}]
        (u/ok-reduce (fn [[res cnt] t]
                       (ok> (elaborate-pred consts prog t cnt) :as [_ t cnt]
                            [:ok [(cons t res) cnt]]))
                     ['() cnt] (second c)) :as [_ [tl cnt]]
-       [:ko> 'elaborate-clause {:c c}]
+       [:ko> 'elaborate-clause {:clause c}]
        [:ok [hd (reverse tl)]]))
 
 (defn get-freevar-types
@@ -361,7 +363,7 @@
                                (combine-env e1 e2)))
                 (if (syn/free? (first t)) {(first t) ty} {})
                 (rest t))
-   [:ko> 'check-freevar-pred {:p t}]
+   [:ko> 'check-freevar-pred {:pred t}]
    ))
 
 (defn elaborate-and-freevar-pred
@@ -380,11 +382,11 @@
   "Check and get freevar types for an elaborated clause `c`"
   [prog c]
   (ok> (check-freevar-pred (first c)) :as [_ fvt]
-       [:ko> 'check-freevar-clause {:c c}]
+       [:ko> 'check-freevar-clause {:clause c}]
        (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred t) :as [_ e2]
                                    (combine-env e1 e2)))
                     fvt (second c))
-       [:ko> 'check-freevar-clause {:c c :fvt fvt}]))
+       [:ko> 'check-freevar-clause {:clause c :fvt fvt}]))
 
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
@@ -427,22 +429,26 @@
 
 (example (valid-type? '#{bool} '(-> i bool)) => :ok)
 
+(defn check-const
+  "Check that the constant `c` use types declared in `types`"
+  [types [c ty]] (ok> (valid-type? types ty) :as _
+                      [:ko> 'check-const {:const c :ty ty}]))
+
 (defn check-consts
   "Check that all `consts` use types declared in `types`"
-  [types consts] (u/every-ok?
-                  (fn [[c ty]] (ok> (valid-type? types ty) :as _
-                                   [:ko> 'check-consts {:const c :ty ty}]))
-                  consts))
+  [types consts] (u/every-ok? (fn [c] (check-const types c)) consts))
+
+(defn check-pred
+  "Check that `p` uses types declared in `types`"
+  [types [p [ty _]]] (ok> (valid-type? types ty) :as _
+                          [:ko> 'check-pred {:pred p :ty ty}]
+                          (when (not (syn/prop-type? (syn/return-type ty)))
+                            [:ko 'check-pred {:pred p :ty ty}])
+                          :ok))
 
 (defn check-preds
-  "Check that all preds in `prog` use types declared in `types`"
-  [types prog]
-  (u/every-ok?
-   (fn [[p [ty _]]] (ok> (valid-type? types ty) :as _
-                        [:ko> 'check-preds {:pred p :ty ty}]
-                        (when (not (syn/prop-type? (syn/return-type ty)))
-                          [:ko 'check-preds {:pred p :ty ty}])
-                        :ok)) prog))
+  "Check that all preds in `prog` uses types declared in `types`"
+  [types prog] (u/every-ok? (fn [p] (check-pred types p)) prog))
 
 (defn elaborate-and-check-program
   "Check and elaborate `prog`, and check that the use of freevars is coherent"

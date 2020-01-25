@@ -5,8 +5,6 @@
 ;; A classic knowledge-base example about family
 ;;}
 
-(lp/start)
-
 (lp/deftype 'person)
 (lp/defconst 'gomez 'person)
 (lp/defconst 'morticia 'person)
@@ -36,8 +34,6 @@
 
 (lp/defpred 'grandparent '(-> person person o))
 (lp/addclause '((grandparent X Z) :- (parent X Y), (parent Y Z)))
-
-(lp/type-check-program)
 
 ;; A few requests
 (lp/solve '(parent gomez Y)) ;; => [:ok {Y pugsley}]

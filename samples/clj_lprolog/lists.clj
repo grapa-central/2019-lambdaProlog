@@ -30,8 +30,6 @@
 (lp/addclause '((reverse (cs X L1) L2) :-
                 (reverse L1 L3), (append L3 (cs X ni) L2)))
 
-(lp/type-check-program)
-
 ;; Some requests
 (lp/solve '(id (cs X (cs Y ni)) L)) ;; => [:ok ...]
 (lp/solve '(member zero (cs Y (cs X ni)))) ;; => [:ok {Y zero}]

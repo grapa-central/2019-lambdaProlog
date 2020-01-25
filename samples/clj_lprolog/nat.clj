@@ -1,8 +1,6 @@
 (ns clj-lprolog.nat
   (:require [clj-lprolog.core :as lp]))
 
-(lp/start)
-
 (lp/deftype 'nat)
 (lp/defconst 'zero 'nat)
 (lp/defconst 'succ '(-> nat nat))
@@ -18,8 +16,6 @@
 
 ;; And only one for odd, using even
 (lp/addclause '((odd (succ N)) :- (even N)))
-
-(lp/type-check-program)
 
 ;; Example requests
 (lp/solve '(even (succ (succ zero)))) ;; => '[:ok {}]
