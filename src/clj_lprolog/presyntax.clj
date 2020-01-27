@@ -163,16 +163,48 @@
            [:ko> 'parsing-applied-pred {:pred p}]
            [:ok (cons (first p) (map (fn [[t]] t) tl))]))
 
+(defn proper-typed-binding?
+  "Check that `t` is a proper typed-binding"
+  [t] (and (seq? t) (= 3 (count t)) (= :> (second t))
+           (syn/user-const? (first t)) (proper-type? (nth t 2))))
+
+(example (proper-typed-binding? '(x :> i)) => true)
+
+(declare parse-clause-body)
+
+(defn parse-goal
+  "Parse one of the goals `g` in a clause"
+  [g] (cond
+        ;; The body is a pi-abstraction
+        (syn/pi? g)
+        (ok>
+         (when (not (proper-typed-binding? (second g))))
+         [:ko 'parse-goal {:goal g}]
+         (parse-clause-body (nthrest g 2)) :as [_ body]
+         [:ok (list 'Π (second g) body)])
+        ;; The body is an implication
+        (syn/imp? g)
+        (ok>
+         (parse-applied-pred (second g)) :as [_ hd]
+         (parse-clause-body (nthrest g 2)) :as [_ body]
+         [:ok (list '=> hd body)])
+        ;; The first term of the body is an applied predicate
+        (syn/applied-pred? g) (parse-applied-pred g)
+        :else [:ko 'parse-goal {:goal g}]))
+
 (defn parse-clause-body
   "Parse the body `b` of a clause"
   [b] (cond
-        (syn/applied-pred? (first b))
-        (ok> (parse-applied-pred (first b)) :as [_ hd]
-             (if (empty? (rest b))
-               [:ok (list hd)]
-               (ok> (parse-clause-body (rest b)) :as [_ tl]
-                    [:ok (cons hd tl)])))
-        :else [:ko 'parse-clause-body {:body b}]))
+        ;; A clause body cannot be empty
+        (or (not (seq? b)) (empty? b)) [:ko 'parse-clause-body {:body b}]
+        ;; If this is the last one
+        (empty? (rest b))
+        (ok> (parse-goal (first b)) :as [_ hd]
+             [:ok (list hd)])
+        :else
+        (ok> (parse-goal (first b)) :as [_ hd]
+             (parse-clause-body (rest b)) :as [_ tl]
+             [:ok (cons hd tl)])))
 
 (defn parse-clause
   "Parse the clause `c`"

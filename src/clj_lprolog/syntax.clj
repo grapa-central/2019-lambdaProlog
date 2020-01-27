@@ -170,7 +170,10 @@
 ;;{
 ;; # Prolog clause syntax
 ;;
-;; A clause is either:
+;; A clause body is either:
+;; - An applied predicate
+;; - A pi abstraction : Π (x :> ty) body
+;; - An implication : p => body
 ;;}
 
 (defn pred?
@@ -185,9 +188,21 @@
 
 (example (applied-pred? '(even (S N))) => true)
 
+(defn imp?
+  "Is `t` an implication ?"
+  [t] (and (seq? t) (> (count t) 2) (= '=> (first t))))
+
+(example (imp? '(=> (infer x A) (infer (M x) B))) => true)
+
+(defn pi?
+  "Is `t` a pi-abstration ?"
+  [t] (and (seq? t) (> (count t) 2) (= 'Π (first t))))
+
+(example (pi? '(Π (x :> term) (=> (infer x A) (infer (M x) B)))) => true)
+
 (defn clause-body?
   "Is `t` a clause body ?"
-  [t] (and (not (empty? t)) (every? applied-pred? t)))
+  [t] (and (seq? t) (not (empty? t))))
 
 (example (clause-body? '((even N) (even O))) => true)
 

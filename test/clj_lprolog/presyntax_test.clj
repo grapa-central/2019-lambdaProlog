@@ -92,6 +92,9 @@
 (t/deftest parse-clause-test
   (t/testing "positive"
     (t/is (u/ok-expr? (syn/parse-clause '((even O)))))
-    (t/is (u/ok-expr? (syn/parse-clause '((even (S N)) :- (even N))))))
+    (t/is (u/ok-expr? (syn/parse-clause '((even (S N)) :- (even N)))))
+    (t/is (u/ok-expr?
+           (syn/parse-clause '((parity P) :-
+                               (Π (n :> i) (=> (P n) (P (S (S n))))))))))
   (t/testing "negative"
     (t/is (u/ko-expr? (syn/parse-clause '((even (S N)) :-))))))

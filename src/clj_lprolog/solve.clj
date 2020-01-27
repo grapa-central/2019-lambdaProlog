@@ -98,6 +98,7 @@
   "Solve the clause body `b` in the context of the program `prog`"
   [prog [si req] cnt]
   (cond (empty? req) [:ok si]
+        ;; The first goal is an applied predicate
         (syn/applied-pred? (first req))
         (solve prog [si req] cnt)))
 
