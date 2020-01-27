@@ -166,3 +166,37 @@
   [ty n] (if (arrow-type? ty)
            (let [heads (take (inc n) ty)]
              (concat heads (list (cons '-> (nthrest ty (inc n))))))))
+
+;;{
+;; # Prolog clause syntax
+;;
+;; A clause is either:
+;;}
+
+(defn pred?
+  "Is `t` a predicate (either defined or free variable) ?"
+  [t] (symbol? t))
+
+(example (pred? 'even) => true)
+
+(defn applied-pred?
+  "Is `t` an applied predicate ?"
+  [t] (and (seq? t) (pred? (first t))))
+
+(example (applied-pred? '(even (S N))) => true)
+
+(defn clause-body?
+  "Is `t` a clause body ?"
+  [t] (and (not (empty? t)) (every? applied-pred? t)))
+
+(example (clause-body? '((even N) (even O))) => true)
+
+(defn clause?
+  "Is `t` a clause ?"
+  [t] (and (seq? t)
+           (applied-pred? (first t))
+           (or (empty? (rest t)) (= (second t) ':-))))
+
+(examples
+ (clause? '((even O))) => true
+ (clause? '((even (S N)) :- (even N))) => true)

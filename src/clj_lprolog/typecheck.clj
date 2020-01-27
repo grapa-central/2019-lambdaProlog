@@ -2,7 +2,6 @@
   "Typechecking of both lambda-terms and full program"
   (:require [clj-lprolog.utils :as u :refer [example examples ok>]]
             [clj-lprolog.syntax :as syn]
-            [clj-lprolog.presyntax :as psyn]
             [clojure.test :as t]
             [clojure.string :as str]))
 
@@ -328,17 +327,27 @@
     [:ko> 'elaborate-pred {:pred p}]
     [:ok (cons (with-meta (first p) {:ty ty}) (reverse tl)) cnt])))
 
+(defn elaborate-clause-body
+  "Elaborate a clause body `b`"
+  [consts prog b cnt]
+  (ok> (cond
+         (empty? b) [:ok '()]
+         ;; The first term of the clause is an applied predicate
+         (syn/applied-pred? (first b))
+         (ok> (elaborate-pred consts prog (first b) cnt) :as [_ hd cnt]
+              (elaborate-clause-body consts prog (rest b) cnt) :as [_ tl]
+              [:ok (cons hd tl)])
+         ;; Either a non well-formed term, or we forgot to implement something :p
+         :else [:ko 'elaborate-clause-body {:b b}])))
+
 (defn elaborate-clause
   "Elaborate terms of a clause `c`"
   [consts prog c]
   (ok> (elaborate-pred consts prog (first c) 0) :as [_ hd cnt]
        [:ko> 'elaborate-clause {:clause c}]
-       (u/ok-reduce (fn [[res cnt] t]
-                      (ok> (elaborate-pred consts prog t cnt) :as [_ t cnt]
-                           [:ok [(cons t res) cnt]]))
-                    ['() cnt] (second c)) :as [_ [tl cnt]]
+       (elaborate-clause-body consts prog (second c) cnt) :as [_ tl]
        [:ko> 'elaborate-clause {:clause c}]
-       [:ok [hd (reverse tl)]]))
+       [:ok [hd tl]]))
 
 (defn get-freevar-types
   "Get the types of free variables in `t`"
@@ -378,14 +387,25 @@
  (elaborate-and-freevar-pred {} {'even ['(-> i o)]} '(even (S N)))
  => [:ok '(even (S N)) {'N 'i}])
 
+(defn check-freevar-clause-body
+  "Check and get freevar types for an elaborated clause body `b`"
+  [prog b fvt]
+  (ok> (cond
+         (empty? b) [:ok fvt]
+         ;; The first term of the clause is an applied predicate
+         (syn/applied-pred? (first b))
+         (ok> (check-freevar-pred (first b)) :as [_ fvt2]
+              (combine-env fvt fvt2) :as [_ fvt]
+              (check-freevar-clause-body prog (rest b) fvt))
+         ;; Either a non well-formed term, or we forgot to implement something :p
+         :else [:ko 'check-freevar-clause-body {:b b}])))
+
 (defn check-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
   [prog c]
   (ok> (check-freevar-pred (first c)) :as [_ fvt]
        [:ko> 'check-freevar-clause {:clause c}]
-       (u/ok-reduce (fn [e1 t] (ok> (check-freevar-pred t) :as [_ e2]
-                                   (combine-env e1 e2)))
-                    fvt (second c))
+       (check-freevar-clause-body prog (second c) fvt)
        [:ko> 'check-freevar-clause {:clause c :fvt fvt}]))
 
 (defn elaborate-and-freevar-clause

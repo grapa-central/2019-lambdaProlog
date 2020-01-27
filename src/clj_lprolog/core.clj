@@ -1,7 +1,8 @@
 (ns clj-lprolog.core
   "Provides the top-level functions for the latte-prolog interpreter"
   (:require [clj-lprolog.utils :as u :refer [ok>]]
-            [clj-lprolog.presyntax :as syn]
+            [clj-lprolog.syntax :as syn]
+            [clj-lprolog.presyntax :as psyn]
             [clj-lprolog.typecheck :as typ]
             [clj-lprolog.solve :as sol]))
 
@@ -21,7 +22,7 @@
 
 ;; Declaration macros, and the functions they use
 (defn deftype-fun
-  [ty] (if (syn/user-type-dec? ty)
+  [ty] (if (psyn/user-type-dec? ty)
          (swap! progtypes (fn [pt] (conj pt ty)))
          (throw (ex-info (str 'deftype) {:ty ty}))))
 
@@ -30,7 +31,7 @@
   [ty] `(deftype-fun ~ty))
 
 (defn defconst-fun
-  [c ty] (if (syn/user-const-dec? c ty)
+  [c ty] (if (psyn/user-const-dec? c ty)
            (let [check (typ/check-const @progtypes [c ty])]
              (if (u/ko-expr? check)
                (throw (ex-info (str (second check)) (nth check 2)))
@@ -43,7 +44,7 @@
   [c ty] `(defconst-fun ~c ~ty))
 
 (defn defpred-fun
-  [p ty] (if (and (syn/pred? p) (syn/proper-type? ty))
+  [p ty] (if (and (syn/pred? p) (psyn/proper-type? ty))
            (let [check (typ/check-pred @progtypes [p [ty '()]])]
              (if (u/ko-expr? check)
                (throw (ex-info (str (second check)) (nth check 2)))
@@ -57,7 +58,7 @@
 
 (defn addclause-fun
   [clause]
-  (let [clause (syn/parse-clause clause)]
+  (let [clause (psyn/parse-clause clause)]
     (if (u/ko-expr? clause)
       (throw (ex-info (str (second clause)) (nth clause 2)))
       (let [clause (typ/elaborate-and-freevar-clause
@@ -87,7 +88,7 @@
 (defn solve
   "Solve the request `req`"
   [req] (u/ok>
-         (syn/parse-applied-pred req) :as [_ req]
+         (psyn/parse-applied-pred req) :as [_ req]
          [:ko> 'parse-request {:req req}]
          (typ/elaborate-and-freevar-pred
           (deref progconsts) (deref progpreds) req) :as [_ req _]

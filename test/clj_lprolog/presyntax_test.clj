@@ -79,35 +79,6 @@
 
 ;; Test on prolog vernacular syntax
 
-(t/deftest pred?-test
-  (t/testing "positive"
-    (t/is (syn/pred? 'even)))
-  (t/testing "negative"
-    (t/is (not (syn/pred? '())))))
-
-(t/deftest applied-pred?-test
-  (t/testing "positive"
-    (t/is (syn/applied-pred? '(even O)))
-    (t/is (syn/applied-pred? '(p A))))
-  (t/testing "negative"
-    (t/is (not (syn/applied-pred? '(() O))))))
-
-(t/deftest clause-body?-test
-  (t/testing "positive"
-    (t/is (syn/clause-body? '((even N))))
-    (t/is (syn/clause-body? '())))
-  (t/testing "negative"
-    (t/is (not (syn/clause-body? '(even N))));; Careful with parenthesis !
-    (t/is (not (syn/clause-body? '((even N) :- (even N) :- (even N)))))))
-
-(t/deftest clause?-test
-  (t/testing "positive"
-    (t/is (syn/clause? '((even O))))
-    (t/is (syn/clause? '((even (S (S N))) (even N))))
-    (t/is (syn/clause? '((even (S (S N))) :- (even N)))))
-  (t/testing "negative"
-    (t/is (not (syn/clause? '(even O)))))) ;; Parenthesis !
-
 (t/deftest user-type-dec?-test
   (t/testing "positive"
     (t/is (syn/user-type-dec? 'nat))
@@ -117,3 +88,10 @@
     (t/is (not (syn/user-type-dec? 'A)))
     (t/is (not (syn/user-type-dec? '(list (list A)))))
     (t/is (not (syn/user-type-dec? '(pair a b))))))
+
+(t/deftest parse-clause-test
+  (t/testing "positive"
+    (t/is (u/ok-expr? (syn/parse-clause '((even O)))))
+    (t/is (u/ok-expr? (syn/parse-clause '((even (S N)) :- (even N))))))
+  (t/testing "negative"
+    (t/is (u/ko-expr? (syn/parse-clause '((even (S N)) :-))))))

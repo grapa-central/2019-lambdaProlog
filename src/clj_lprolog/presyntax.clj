@@ -157,51 +157,32 @@
 ;; as its head, and some other predicates applied as its body
 ;;}
 
-(defn pred?
-  "Is `t` a predicate (either defined or free variable) ?"
-  [t] (symbol? t))
-
-(example (pred? 'even) => true)
-
-(defn applied-pred?
-  "Is `t` an applied predicate ?"
-  [t] (and (seq? t) (pred? (first t))))
-
-(example (applied-pred? '(even (S N))) => true)
-
 (defn parse-applied-pred
   "Parse the arguments of an applied predicate `p`"
   [p] (ok> (u/ok-map parse (rest p)) :as [_ tl]
            [:ko> 'parsing-applied-pred {:pred p}]
            [:ok (cons (first p) (map (fn [[t]] t) tl))]))
 
-(defn clause-body?
-  "Is `t` a clause body ?"
-  [t] (every? applied-pred? t))
-
-(example (clause-body? '((even N) (even O))) => true)
-
-(defn clause?
-  "Is `t` a clause ?"
-  [t] (and (seq? t)
-           (applied-pred? (first t))
-           (or (clause-body? (rest t))
-               (and (= (second t) ':-) (clause-body? (nthrest t 2))))))
-
-(examples
- (clause? '((even (S N)) :- (even N))) => true
- (clause? '((even (S N)) (even N))) => true)
+(defn parse-clause-body
+  "Parse the body `b` of a clause"
+  [b] (cond
+        (syn/applied-pred? (first b))
+        (ok> (parse-applied-pred (first b)) :as [_ hd]
+             (if (empty? (rest b))
+               [:ok (list hd)]
+               (ok> (parse-clause-body (rest b)) :as [_ tl]
+                    [:ok (cons hd tl)])))
+        :else [:ko 'parse-clause-body {:body b}]))
 
 (defn parse-clause
-  "Parse the clause `c` (removes the :-)"
-  [c] (ok> (when (not (clause? c)) [:ko 'parse-clause {:clause c}])
+  "Parse the clause `c`"
+  [c] (ok> (when (not (syn/clause? c)) [:ko 'parse-clause {:clause c}])
            (parse-applied-pred (first c)) :as [_ hd]
-           [:ko> 'parsing-clause {:clause c}]
-           (if (clause-body? (rest c))
-             (u/ok-map parse-applied-pred (rest c))
-             (u/ok-map parse-applied-pred (nthrest c 2))) :as [_ tl]
-           [:ko> 'parsing-clause {:clause c}]
-           [:ok [hd (map (fn [[t]] t) tl)]]))
+           [:ko> 'parse-clause {:clause c}]
+           (if (empty? (rest c)) [:ok '()]
+               (parse-clause-body (nthrest c 2))) :as [_ tl]
+           [:ko> 'parse-clause {:clause c}]
+           [:ok [hd tl]]))
 
 (defn user-type-dec?
   "Is `ty` a well-formed type definition"

@@ -34,10 +34,18 @@
   "Instantiate the predicate `p` by suffixing free-variables with `count`"
   [count p] (map (fn [t] (instantiate-term count t)) p))
 
+(defn instantiate-clause-body
+  "Instantiate the clause body `cl` by suffixing free-variables with `count`"
+  [count b] (cond
+              (empty? b) '()
+              (syn/applied-pred? (first b))
+              (cons (instantiate-pred count (first b))
+                    (instantiate-clause-body count (rest b)))))
+
 (defn instantiate-clause
   "Instantiate the clause `cl` by suffixing free-variables with `count`"
   [count cl] [(instantiate-pred count (first cl))
-              (map (fn [p] (instantiate-pred count p)) (second cl))])
+              (instantiate-clause-body count (second cl))])
 
 (example
  (instantiate-clause 42 '[(even (succ N)) ((odd N))])
@@ -84,33 +92,42 @@
    [(reduce (fn [s1 s2] (clojure.set/union s1 s2)) #{} poss)
     (+ cnt (count clauses))]))
 
+(declare solve)
+
+(defn solve-body
+  "Solve the clause body `b` in the context of the program `prog`"
+  [prog [si req] cnt]
+  (cond (empty? req) [:ok si]
+        (syn/applied-pred? (first req))
+        (solve prog [si req] cnt)))
+
 (defn solve
   "Solve `req` in the context of the program `prog`"
   ([prog req]
-   (ok> (solve prog [{} (list req)] 0) :as [_ subst]
+   (ok> (solve-body prog [{} (list req)] 0) :as [_ subst]
         (uni/get-freevars req) :as freevars
         [:ok (u/map-of-pair-list
               (map (fn [x] [x (uni/apply-subst subst x)]) freevars))]))
   ([prog [si req] cnt]
-   (if (empty? req) [:ok si]
-       (ok>
-        ;; Let's try to solve the first constraint
-        (uni/apply-subst si (first req)) :as scrut
-        ;; Find the applicable clause bodies
-        (compatible-clauses (second (get prog (first scrut)))
-                            scrut si cnt) :as [poss cnt]
-        ;; If we didn't find any result, ko
-        (when (empty? poss) [:ko 'solve {:req req}])
-        ;; Research heuristic : start with the possibilities
-        ;; that add the least number of clauses
-        (sort (fn [[_ b1] [_ b2]] (compare (count b1) (count b2))) poss) :as poss
-        ;; Recursive calls (return the first correct one)
-        (some
-         (fn [[si cl]] (let [res (solve prog [si (concat cl (rest req))] cnt)]
-                        (when (u/ok-expr? res) (second res))))
-         poss) :as ress
-        (when (nil? ress) [:ko 'solve {:req req}])
-        [:ok ress]))))
+   (ok>
+    ;; Let's try to solve the first constraint
+    (uni/apply-subst si (first req)) :as scrut
+    ;; Find the applicable clause bodies
+    (compatible-clauses (second (get prog (first scrut)))
+                        scrut si cnt) :as [poss cnt]
+    ;; If we didn't find any result, ko
+    (when (empty? poss) [:ko 'solve {:req req}])
+    ;; Research heuristic : start with the possibilities
+    ;; that add the least number of clauses
+    (sort (fn [[_ b1] [_ b2]] (compare (count b1) (count b2))) poss) :as poss
+    ;; Recursive calls (return the first correct one)
+    (some
+     (fn [[si cl]]
+       (let [res (solve-body prog [si (concat cl (rest req))] cnt)]
+         (when (u/ok-expr? res) (second res))))
+     poss) :as ress
+    (when (nil? ress) [:ko 'solve {:req req}])
+    [:ok ress])))
 
 (example
  (solve '{even [(-> nat o) {(even zero) (), (even (succ (succ N))) ((even N))}]}
