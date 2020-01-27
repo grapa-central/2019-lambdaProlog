@@ -24,7 +24,7 @@
 ;; Tests on solving algorithm
 
 (t/deftest unify-clause-test
-  (t/is (= '[:ok #{[{N (succ zero)} ((odd (succ zero)))]}]
+  (t/is (= '[:ok #{[{N (succ zero)} ((odd N))]}]
            (sol/unify-clause '(even (succ (succ zero)))
                              '[(even (succ N)) ((odd N))])))
   (t/is (u/ko-expr?

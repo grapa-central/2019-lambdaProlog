@@ -2,7 +2,8 @@
   (:require [clj-lprolog.utils :as u :refer [example examples ok>]]
             [clj-lprolog.unif :as uni]
             [clj-lprolog.syntax :as syn]
-            [clj-lprolog.typecheck :as typ]))
+            [clj-lprolog.typecheck :as typ]
+            [clojure.string :as str]))
 
 (def +examples-enabled+ true)
 
@@ -12,12 +13,14 @@
 ;; In order to avoid naming conflict, we will systematically rename free variables
 ;; on a clause-by-clause basis. The renaming consists in suffixing the variable
 ;; name with a number.
+;; We must also rename variables bound by a pi-abstraction
 ;; Of course, typing information is preserved throughout
 ;;}
 
 (defn instantiate-free-var
   "Actually instantiate `var` by suffixing it with `count`"
-  [count var] (symbol (str var "_" count)))
+  [count var] (if (str/includes? (str var ) "_") var ;; Do not instantiate twice !
+                  (symbol (str var "_" count))))
 
 (defn instantiate-term
   "Instantiate the term `t` by suffixing free-variables with `count`"
@@ -34,13 +37,22 @@
   "Instantiate the predicate `p` by suffixing free-variables with `count`"
   [count p] (map (fn [t] (instantiate-term count t)) p))
 
+(declare instantiate-clause-body)
+
+(defn instantiate-goal
+  "Instantiate a goal `g` by suffixing free-variables with `count`"
+  [count g]
+  (cond
+    (syn/pi? g) (list 'Π (second g) (instantiate-clause-body count (nth g 2)))
+    (syn/imp? g) (list '=> (instantiate-pred count (second g))
+                       (instantiate-clause-body count (nth g 2)))
+    (syn/applied-pred? g) (instantiate-pred count g)))
+
 (defn instantiate-clause-body
-  "Instantiate the clause body `cl` by suffixing free-variables with `count`"
-  [count b] (cond
-              (empty? b) '()
-              (syn/applied-pred? (first b))
-              (cons (instantiate-pred count (first b))
-                    (instantiate-clause-body count (rest b)))))
+  "Instantiate the clause body `b` by suffixing free-variables with `count`"
+  [count b] (if (empty? b) '()
+                (cons (instantiate-goal count (first b))
+                      (instantiate-clause-body count (rest b)))))
 
 (defn instantiate-clause
   "Instantiate the clause `cl` by suffixing free-variables with `count`"
@@ -50,6 +62,51 @@
 (example
  (instantiate-clause 42 '[(even (succ N)) ((odd N))])
  => '[(even (succ N_42)) ((odd N_42))])
+
+(defn instantiatepi-const
+  "Actually instantiate `var` by suffixing it with `count`"
+  [count var] (symbol (str var "_" count)))
+
+(defn instantiatepi-term
+  "Instantiate the term `t` by suffixing occurences of `x` with `count`"
+  [x count t]
+  (with-meta
+    (cond
+      (and (syn/user-const? t) (= t x)) (instantiatepi-const count x)
+      (syn/lambda? t) (list 'λ (second t) (instantiatepi-term x count (nth t 2)))
+      (syn/application? t) (map (fn [t] (instantiatepi-term x count t)) t)
+      :else t)
+    {:ty (typ/type-of t)}))
+
+(defn instantiatepi-pred
+  "Instantiate the predicate `p` by suffixing occurences of `x` with `count`"
+  [x count p] (map (fn [t] (instantiatepi-term x count t)) p))
+
+(declare instantiatepi-clause-body)
+
+(defn instantiatepi-goal
+  "Instantiate a goal `g` by suffixing occurences of `x` with `count`"
+  [x count g]
+  (cond
+    (syn/pi? g) (list 'Π (second g) (instantiatepi-clause-body x count (nth g 2)))
+    (syn/imp? g) (list '=> (instantiatepi-pred x count (second g))
+                       (instantiatepi-clause-body x count (nth g 2)))
+    (syn/applied-pred? g) (instantiatepi-pred x count g)))
+
+(defn instantiatepi-clause-body
+  "Instantiate the clause body `b` by suffixing occurences of `x` with `count`"
+  [x count b] (if (empty? b) '()
+                (cons (instantiatepi-goal x count (first b))
+                      (instantiatepi-clause-body x count (rest b)))))
+
+(defn instantiatepi-clause
+  "Instantiate the clause `cl` by suffixing occurences of `x` with `count`"
+  [x count cl] [(instantiatepi-pred x count (first cl))
+              (instantiatepi-clause-body x count (second cl))])
+
+(example
+ (instantiatepi-clause 'x 42 '[(even (succ x)) ((odd N))])
+ => '[(even (succ x_42)) ((odd N))])
 
 ;;{
 ;; # Solving algorithm
@@ -65,18 +122,11 @@
   (ok> (uni/unify req head) :as [_ substs]
        (map (fn [si'] (uni/compose-subst si si')) substs) :as substs
        (map (fn [[_ si]] si) (filter u/ok-expr? substs)) :as substs
-       [:ok (set (map
-                  (fn [subst]
-                    [subst
-                     (map (fn [p] (map (fn [t] (uni/apply-subst subst t)) p))
-                          body)]) substs))])))
+       [:ok (set (map (fn [subst] [subst body]) substs))])))
 
 (example
  (unify-clause '(even (succ zero)) '[(even (succ N)) ((odd N))])
- => '[:ok #{[{N zero} ((odd zero))]}])
-
-(unify-clause '(append (cs zero ni) L L)
-              '[(append (cs X L1) L2 (cs X L3)) ((append L1 L2 L3))])
+ => '[:ok #{[{N zero} ((odd N))]}])
 
 (defn compatible-clauses
   "Get the instantiated clauses compatibles with `req` among `clauses`.
@@ -98,9 +148,24 @@
   "Solve the clause body `b` in the context of the program `prog`"
   [prog [si req] cnt]
   (cond (empty? req) [:ok si]
-        ;; The first goal is an applied predicate
-        (syn/applied-pred? (first req))
-        (solve prog [si req] cnt)))
+        ;; Pi-abstraction : instantiate the constants with a fresh identifier
+        (syn/pi? (first req))
+        (ok> (first (second (first req))) :as x
+             (instantiatepi-clause-body x cnt (nth (first req) 2)) :as req1
+             (rest req) :as req2
+             (solve-body prog [si (concat req1 req2)] (inc cnt)))
+        ;; Implication : add a dynamic clause to the program
+        (syn/imp? (first req))
+        (ok> (uni/apply-subst si (second (first req))) :as assump
+             (nth (first req) 2) :as req1
+             (rest req) :as req2
+             (get prog (first assump)) :as [ty clauses]
+             (cons [assump '()] clauses) :as clauses
+             (assoc prog (first assump) [ty clauses]) :as prog
+             (println prog)
+             (solve-body prog [si (concat req1 req2)] (inc cnt)))
+        ;; Solve an applied predicate
+        (syn/applied-pred? (first req)) (solve prog [si req] cnt)))
 
 (defn solve
   "Solve `req` in the context of the program `prog`"

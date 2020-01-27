@@ -31,7 +31,7 @@
 
 (defn subst
   "Substitute a term `v` to the unification variable `var` in `t`"
-  [var v t] (with-meta
+  [var v t] (do (with-meta
               (cond
                 ;; t is the right unification variable
                 (and (syn/free? t) (= var t)) v
@@ -43,7 +43,7 @@
                 (map (fn [t] (subst var v t)) t)
                 ;; otherwise (primitive or bound variable)
                 :else t)
-              {:ty (typ/type-of t)}))
+              {:ty (typ/type-of t)})))
 
 (example
  (subst 'A '(S O) '((λ 2 A) A B)) => '((λ 2 (S O)) (S O) B))
