@@ -10,6 +10,11 @@
 (lp/defconst 'abs '(-> (-> term term) term))
 (lp/defconst 'app '(-> term term term))
 
+;; The type syntax
+(lp/deftype 'typ)
+(lp/defconst 'bool 'typ)
+(lp/defconst 'arr '(-> typ typ typ))
+
 ;; Evaluation
 (lp/defpred 'eval '(-> term term o))
 (lp/addclause '((eval tr tr)))
@@ -24,6 +29,17 @@
 (def S '(abs (λ [x] (abs (λ [y] (abs (λ [z] (app (app x z) (app y z)))))))))
 
 ;; SKK is the Identity
-(lp/solve (list 'eval (list 'app (list 'app (list 'app S K) K) 'fl) 'V))
-;; (DELTA DELTA) loops
+(lp/solve (list 'eval (list 'app (list 'app (list 'app S K) K) 'fl)'V))
+;;(DELTA DELTA) loops
 ;;(lp/solve (list 'eval (list 'app DELTA DELTA) 'V))
+
+;; Type inference
+(lp/defpred 'infer '(-> term typ o))
+(lp/addclause '((infer tr bool)))
+(lp/addclause '((infer fl bool)))
+(lp/addclause '((infer (app M N) B) :- (infer M (arr A B)) (infer N A)))
+(lp/addclause '((infer (abs M) (arr A B)) :-
+                (Π (x :> term) (=> (infer x A) (infer (M x) B)))))
+
+;; Some typing examples
+;;(lp/solve '(infer (abs (λ [x] x)) Ty))

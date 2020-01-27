@@ -62,7 +62,7 @@
     (if (u/ko-expr? clause)
       (throw (ex-info (str (second clause)) (nth clause 2)))
       (let [clause (typ/elaborate-and-freevar-clause
-                    @progconsts @progpreds (second clause))]
+                    @progtypes @progconsts @progpreds (second clause))]
         (if (u/ko-expr? clause)
           (throw (ex-info (str (second clause)) (nth clause 2)))
           (swap! progpreds
