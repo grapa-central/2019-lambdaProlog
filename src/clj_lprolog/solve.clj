@@ -108,6 +108,20 @@
  (instantiatepi-clause 'x 42 '[(even (succ x)) ((odd N))])
  => '[(even (succ x_42)) ((odd N))])
 
+(defn get-instantiated-vars
+  "Get the set of instantiated vars in `t`"
+  [t] (cond
+        (and (syn/free? t) (str/includes? (str t) "_")) #{t}
+        (syn/lambda? t) (get-instantiated-vars (nth t 2))
+        (syn/application? t)
+        (reduce (fn [s t] (clojure.set/union s (get-instantiated-vars t))) #{} t)
+        :else #{}))
+
+(defn dynamic-clause?
+  "Check if the clause was added dynamically by an implication, ie if it
+  doesn't have a tail or contains instantiated variables"
+  [[hd tl]] (and (empty? tl) (not (empty? (get-instantiated-vars hd)))))
+
 ;;{
 ;; # Solving algorithm
 ;;
@@ -134,6 +148,9 @@
   Also manipulates the fresh-variable counter `cnt`"
   [clauses req si cnt]
   (ok>
+   ;; Apply the substitution to dynamic clauses
+   (map (fn [[hd tl]] [(if (dynamic-clause? [hd tl])
+                        (uni/apply-subst si hd) hd) tl]) clauses) :as clauses
    ;; Instantiate fresh variable names
    (reduce
     (fn [[clauses cnt] cl] [(cons (instantiate-clause cnt cl) clauses) (inc cnt)])
