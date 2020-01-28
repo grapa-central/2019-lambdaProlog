@@ -122,6 +122,7 @@
   (ok> (uni/unify req head) :as [_ substs]
        (map (fn [si'] (uni/compose-subst si si')) substs) :as substs
        (map (fn [[_ si]] si) (filter u/ok-expr? substs)) :as substs
+       (uni/occur-check-substs substs) :as substs
        [:ok (set (map (fn [subst] [subst body]) substs))])))
 
 (example
@@ -162,7 +163,6 @@
              (get prog (first assump)) :as [ty clauses]
              (cons [assump '()] clauses) :as clauses
              (assoc prog (first assump) [ty clauses]) :as prog
-             (println prog)
              (solve-body prog [si (concat req1 req2)] (inc cnt)))
         ;; Solve an applied predicate
         (syn/applied-pred? (first req)) (solve prog [si req] cnt)))

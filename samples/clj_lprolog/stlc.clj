@@ -48,3 +48,4 @@
 (lp/solve '(infer (abs (λ [x] x)) Ty))
 (lp/solve (list 'infer KII 'Ty)) ;; KII is the identity
 (lp/solve (list 'infer SKK 'Ty)) ;; SKK is also the identity
+(lp/solve (list 'infer (list 'app DELTA DELTA) 'Ty))

@@ -87,6 +87,14 @@
  (compose-subst-sets '#{{A a} {B b}} '#{{A a} {B a}})
  => '#{{A a} {A a B a} {B b A a}})
 
+(defn occur-check-substs
+  "Filter the substitutions in `substs`, keeping only the ones 
+  without occur-check"
+  [substs]
+  (set (filter
+        (fn [si] (not (some (fn [[v t]] (some #{v} (get-freevars t))) (seq si))))
+        substs)))
+
 ;;{
 ;; # First order unification
 ;;
@@ -377,8 +385,9 @@
   "Unify `t1` and `t2` (return a set of unifying substitutions),
   using first-order unification if applicable and the high-order
   huet algorithm otherwise"
-  [t1 t2] (let [t1 (nor/simplify-term t1)
-                t2 (nor/simplify-term t2)]
-            (if (and (first-order-term? t1) (first-order-term? t2))
-              (first-order-unify t1 t2)
-              (huet (list [t1 t2])))))
+  [t1 t2]
+  (ok> (nor/simplify-term t1) :as t1
+       (nor/simplify-term t2) :as t2
+       (if (and (first-order-term? t1) (first-order-term? t2))
+         (first-order-unify t1 t2)
+         (huet (list [t1 t2])))))
