@@ -143,7 +143,7 @@
       (t/is (= {'N 'i}
                (nth
                 (typ/elaborate-and-freevar-clause
-                 {} (deref cor/progpreds) '((even (S N)) ((odd N)))) 2)))))
+                 {} {} (deref cor/progpreds) '((even (S N)) ((odd N)))) 2)))))
   (t/testing "pred"
     (do
       (cor/start)
@@ -151,7 +151,7 @@
       (t/is (= {'P '(-> i o) 'N 'i}
                (nth
                 (typ/elaborate-and-freevar-clause
-                 {} (deref cor/progpreds) '((applypred P N) ((P N)))) 2)))))
+                 {} {} (deref cor/progpreds) '((applypred P N) ((P N)))) 2)))))
   (t/testing "incoherent"
     (do
       (cor/start)
@@ -159,7 +159,7 @@
       (cor/defpred 'odd '(-> o o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-clause
-              {} (deref cor/progpreds) '((even (S N)) ((odd N)))))))))
+              {} {} (deref cor/progpreds) '((even (S N)) ((odd N)))))))))
 
 (t/deftest elaborate-program-test
   (t/testing "oddeven"
@@ -172,7 +172,7 @@
       (cor/addclause '((odd (S O))))
       (cor/addclause '((odd (S N)) :- (even N)))
       (t/is (= [:ok (deref cor/progpreds)]
-               (typ/elaborate-program {} (deref cor/progpreds)))))))
+               (typ/elaborate-program {} {} (deref cor/progpreds)))))))
 
 (t/deftest valid-type?-test
   (t/testing "positive"

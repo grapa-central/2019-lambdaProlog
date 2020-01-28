@@ -157,51 +157,64 @@
 ;; as its head, and some other predicates applied as its body
 ;;}
 
-(defn pred?
-  "Is `t` a predicate (either defined or free variable) ?"
-  [t] (symbol? t))
-
-(example (pred? 'even) => true)
-
-(defn applied-pred?
-  "Is `t` an applied predicate ?"
-  [t] (and (seq? t) (pred? (first t))))
-
-(example (applied-pred? '(even (S N))) => true)
-
 (defn parse-applied-pred
   "Parse the arguments of an applied predicate `p`"
   [p] (ok> (u/ok-map parse (rest p)) :as [_ tl]
            [:ko> 'parsing-applied-pred {:pred p}]
            [:ok (cons (first p) (map (fn [[t]] t) tl))]))
 
-(defn clause-body?
-  "Is `t` a clause body ?"
-  [t] (every? applied-pred? t))
+(defn proper-typed-binding?
+  "Check that `t` is a proper typed-binding"
+  [t] (and (seq? t) (= 3 (count t)) (= :> (second t))
+           (syn/user-const? (first t)) (proper-type? (nth t 2))))
 
-(example (clause-body? '((even N) (even O))) => true)
+(example (proper-typed-binding? '(x :> i)) => true)
 
-(defn clause?
-  "Is `t` a clause ?"
-  [t] (and (seq? t)
-           (applied-pred? (first t))
-           (or (clause-body? (rest t))
-               (and (= (second t) ':-) (clause-body? (nthrest t 2))))))
+(declare parse-clause-body)
 
-(examples
- (clause? '((even (S N)) :- (even N))) => true
- (clause? '((even (S N)) (even N))) => true)
+(defn parse-goal
+  "Parse one of the goals `g` in a clause"
+  [g] (cond
+        ;; The body is a pi-abstraction
+        (syn/pi? g)
+        (ok>
+         (when (not (proper-typed-binding? (second g))))
+         [:ko 'parse-goal {:goal g}]
+         (parse-clause-body (nthrest g 2)) :as [_ body]
+         [:ok (list 'Π (second g) body)])
+        ;; The body is an implication
+        (syn/imp? g)
+        (ok>
+         (parse-applied-pred (second g)) :as [_ hd]
+         (parse-clause-body (nthrest g 2)) :as [_ body]
+         [:ok (list '=> hd body)])
+        ;; The first term of the body is an applied predicate
+        (syn/applied-pred? g) (parse-applied-pred g)
+        :else [:ko 'parse-goal {:goal g}]))
+
+(defn parse-clause-body
+  "Parse the body `b` of a clause"
+  [b] (cond
+        ;; A clause body cannot be empty
+        (or (not (seq? b)) (empty? b)) [:ko 'parse-clause-body {:body b}]
+        ;; If this is the last one
+        (empty? (rest b))
+        (ok> (parse-goal (first b)) :as [_ hd]
+             [:ok (list hd)])
+        :else
+        (ok> (parse-goal (first b)) :as [_ hd]
+             (parse-clause-body (rest b)) :as [_ tl]
+             [:ok (cons hd tl)])))
 
 (defn parse-clause
-  "Parse the clause `c` (removes the :-)"
-  [c] (ok> (when (not (clause? c)) [:ko 'parse-clause {:clause c}])
+  "Parse the clause `c`"
+  [c] (ok> (when (not (syn/clause? c)) [:ko 'parse-clause {:clause c}])
            (parse-applied-pred (first c)) :as [_ hd]
-           [:ko> 'parsing-clause {:clause c}]
-           (if (clause-body? (rest c))
-             (u/ok-map parse-applied-pred (rest c))
-             (u/ok-map parse-applied-pred (nthrest c 2))) :as [_ tl]
-           [:ko> 'parsing-clause {:clause c}]
-           [:ok [hd (map (fn [[t]] t) tl)]]))
+           [:ko> 'parse-clause {:clause c}]
+           (if (empty? (rest c)) [:ok '()]
+               (parse-clause-body (nthrest c 2))) :as [_ tl]
+           [:ko> 'parse-clause {:clause c}]
+           [:ok [hd tl]]))
 
 (defn user-type-dec?
   "Is `ty` a well-formed type definition"

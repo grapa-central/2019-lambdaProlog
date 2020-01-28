@@ -114,3 +114,33 @@
 
 (t/deftest normalize-ty-tes
   (t/is (= 'A (syn/normalize-ty '(-> A)))))
+
+;; Tests on clause syntax
+
+(t/deftest pred?-test
+  (t/testing "positive"
+    (t/is (syn/pred? 'even)))
+  (t/testing "negative"
+    (t/is (not (syn/pred? '())))))
+
+(t/deftest applied-pred?-test
+  (t/testing "positive"
+    (t/is (syn/applied-pred? '(even O)))
+    (t/is (syn/applied-pred? '(p A))))
+  (t/testing "negative"
+    (t/is (not (syn/applied-pred? '(() O))))))
+
+(t/deftest clause-body?-test
+  (t/testing "positive"
+    (t/is (syn/clause-body? '((even N))))
+    (t/is (syn/clause-body? '((even N) (even (S (S N)))))))
+  (t/testing "negative"
+    (t/is (not (syn/clause-body? '())))))
+
+(t/deftest clause?-test
+  (t/testing "positive"
+    (t/is (syn/clause? '((even O))))
+    (t/is (syn/clause? '((even (S (S N))) :- (even N)))))
+  (t/testing "negative"
+    (t/is (not (syn/clause? '((even (S (S N))) (even N)))))
+    (t/is (not (syn/clause? '(even O)))))) ;; Parenthesis !

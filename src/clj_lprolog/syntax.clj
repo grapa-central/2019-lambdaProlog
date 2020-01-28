@@ -166,3 +166,52 @@
   [ty n] (if (arrow-type? ty)
            (let [heads (take (inc n) ty)]
              (concat heads (list (cons '-> (nthrest ty (inc n))))))))
+
+;;{
+;; # Prolog clause syntax
+;;
+;; A clause body is either:
+;; - An applied predicate
+;; - A pi abstraction : Π (x :> ty) body
+;; - An implication : p => body
+;;}
+
+(defn pred?
+  "Is `t` a predicate (either defined or free variable) ?"
+  [t] (symbol? t))
+
+(example (pred? 'even) => true)
+
+(defn applied-pred?
+  "Is `t` an applied predicate ?"
+  [t] (and (seq? t) (pred? (first t))))
+
+(example (applied-pred? '(even (S N))) => true)
+
+(defn imp?
+  "Is `t` an implication ?"
+  [t] (and (seq? t) (> (count t) 2) (= '=> (first t))))
+
+(example (imp? '(=> (infer x A) (infer (M x) B))) => true)
+
+(defn pi?
+  "Is `t` a pi-abstration ?"
+  [t] (and (seq? t) (> (count t) 2) (= 'Π (first t))))
+
+(example (pi? '(Π (x :> term) (=> (infer x A) (infer (M x) B)))) => true)
+
+(defn clause-body?
+  "Is `t` a clause body ?"
+  [t] (and (seq? t) (not (empty? t))))
+
+(example (clause-body? '((even N) (even O))) => true)
+
+(defn clause?
+  "Is `t` a clause ?"
+  [t] (and (seq? t)
+           (applied-pred? (first t))
+           (or (empty? (rest t)) (= (second t) ':-))))
+
+(examples
+ (clause? '((even O))) => true
+ (clause? '((even (S N)) :- (even N))) => true)
