@@ -31,7 +31,7 @@
 
 (defn subst
   "Substitute a term `v` to the unification variable `var` in `t`"
-  [var v t] (do (with-meta
+  [var v t] (do (typ/set-type
               (cond
                 ;; t is the right unification variable
                 (and (syn/free? t) (= var t)) v
@@ -43,7 +43,7 @@
                 (map (fn [t] (subst var v t)) t)
                 ;; otherwise (primitive or bound variable)
                 :else t)
-              {:ty (typ/type-of t)})))
+              (typ/type-of t))))
 
 (example
  (subst 'A '(S O) '((λ 2 A) A B)) => '((λ 2 (S O)) (S O) B))
@@ -223,12 +223,12 @@
 (defn normal-form-arg
   "Put an arg `e` into normal form with `n` abstractions,
   keep the right metadata from `ty`"
-  [e n ty] (with-meta (nor/normalize (list 'λ n e))
-             {:ty (cons '->
-                        (concat (first (syn/destruct-arrow ty n))
-                                (list (typ/type-of e))))}))
+  [e n ty] (typ/set-type (nor/normalize (list 'λ n e))
+                         (cons '->
+                               (concat (first (syn/destruct-arrow ty n))
+                                       (list (typ/type-of e))))))
 
-(example (normal-form-arg (with-meta 'O {:ty 'i}) 2 '(-> i i o))
+(example (normal-form-arg (typ/set-type 'O 'i) 2 '(-> i i o))
          => '(λ 2 (O)))
 
 (defn simpl
@@ -276,14 +276,14 @@
 (defn eta-fresh-unknown
   "Generate an application of a fresh variable `i` to `k` arguments
   following the input type `ty` with return type `rty`"
-  [i k ty rty] (with-meta
-                 (cons (with-meta
+  [i k ty rty] (typ/set-type
+                 (cons (typ/set-type
                          (fresh-unknown i)
-                         {:ty (concat
-                               (take (inc k) ty)
-                               (list rty))})
+                         (concat
+                          (take (inc k) ty)
+                          (list rty)))
                        (nor/eta-params ty))
-                 {:ty rty}))
+                 rty))
 
 (defn match
   "Non deterministic Match procedure : takes a flexible-rigid pair <`e1`, `e2`>,
@@ -297,9 +297,9 @@
         ;; Imitation
         (if (or (syn/primitive? (head e2)) (syn/user-const? (head e2)))
           [#{{v
-              (with-meta
+              (typ/set-type
                 (list 'λ n
-                      (with-meta
+                      (typ/set-type
                         (cons (head e2)
                               (let [k (second e2)
                                     ty (typ/type-of (head e2))]
@@ -309,8 +309,8 @@
                                  (map vector (tail e2)
                                       (take (count (tail e2))
                                             (iterate inc cunknown))))))
-                        {:ty (typ/type-of (nth e2 2))}))
-                {:ty (typ/type-of v)})}} (+ cunknown (count (tail e2)))]
+                        (typ/type-of (nth e2 2))))
+                (typ/type-of v))}} (+ cunknown (count (tail e2)))]
           [#{} cunknown]) :as [imitation cunknown]
         ;; Projections
         (syn/return-type vty) :as beta
@@ -319,17 +319,17 @@
            (ok>
             (clojure.set/union
              s #{{v
-                  (with-meta
+                  (typ/set-type
                     (list 'λ n
-                          (with-meta
-                            (cons (with-meta #{i} {:ty ty})
+                          (typ/set-type
+                            (cons (typ/set-type #{i} ty)
                                   (map (fn [[ty i]]
                                          (eta-fresh-unknown i n vty ty))
                                        (map vector (syn/param-types ty)
                                             (take (count (syn/param-types ty))
                                                   (iterate inc cunknown)))))
-                            {:ty beta}))
-                    {:ty vty})}}) :as s
+                            beta))
+                    vty)}}) :as s
             [s (+ cunknown (count (syn/param-types ty)))]))
          [#{} cunknown]
          (filter (fn [[i ty]] (= beta (syn/return-type ty)))

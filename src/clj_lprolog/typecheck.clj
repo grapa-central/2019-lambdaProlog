@@ -16,6 +16,7 @@
   [types ty] (cond
                (syn/nat-type? ty) :ok
                (syn/prop-type? ty) :ok
+               (syn/string-type? ty) :ok
                (syn/user-type? ty)
                (if (contains? types ty) :ok [:ko 'check-type {:ty ty}])
                (syn/arrow-type? ty)
@@ -196,6 +197,18 @@
 
 (example (rename-type-vars 42 '(-> A B A)) => '(-> TyA42 TyB42 TyA42))
 
+(defn type-of
+  "Retrieve type information for an elaborated term `t`"
+  [t] (cond
+        (syn/string-lit? t) 'string
+        :else (get (meta t) :ty)))
+
+(defn set-type
+  "Set the type information for a term `t`"
+  [t ty] (cond
+           (syn/string-lit? t) t
+           :else (with-meta t {:ty ty})))
+
 (defn subst-infer-term
   "Infer the type of `t`.
    The call to the 2-parameters version returns a vector with:
@@ -215,22 +228,25 @@
       (when (>= (first t) (count env))
         [:ko> 'outside-env {:n (first t) :env env}])
       (nth env (first t)) :as ty
-      [:ok {} ty (with-meta t {:ty ty}) cnt])
+      [:ok {} ty (set-type t ty) cnt])
 
      ;; t is a free variable
      (syn/free? t) (let [ty (fresh-tvar cnt)]
-                     [:ok {} ty (with-meta t {:ty ty}) (inc cnt)])
+                     [:ok {} ty (set-type t ty) (inc cnt)])
+
+     ;; t is a string literal
+     (syn/string-lit? t) [:ok {} 'string t cnt]
 
      ;; t is a primitive
      (syn/primitive? t)
      (ok> (get primitive-env t) :as ty
-          [:ok {} ty (with-meta t {:ty ty}) cnt])
+          [:ok {} ty (set-type t ty) cnt])
 
      ;; t is a user constant
      (syn/user-const? t)
      (ok> (when (not (contains? consts t)) [:ko 'user-const {:const t}])
           (rename-type-vars cnt (get consts t)) :as ty
-          [:ok {} ty (with-meta t {:ty ty}) (inc cnt)])
+          [:ok {} ty (set-type t ty) (inc cnt)])
 
      ;; t is a lambda-abstraction
      (syn/lambda? t)
@@ -244,7 +260,7 @@
           (concat (if (seq? ty1)
                     (cons '-> ty1)
                     (list '-> ty1)) (list ty2))) :as ty
-      [:ok si ty (with-meta (list 'λ (second t) t') {:ty ty}) cnt])
+      [:ok si ty (set-type (list 'λ (second t) t') ty) cnt])
 
      ;; t is an application
      (syn/application? t)
@@ -267,7 +283,7 @@
       [:ko 'type-infer-app {:t t}]
       (compose-subst si sihdtl) :as [_ si']
       [:ko 'type-infer-app {:t t}]
-      [:ok si' ty (with-meta (cons hd' tl') {:ty ty}) (inc cnt)]))))
+      [:ok si' ty (set-type (cons hd' tl') ty) (inc cnt)]))))
 
 (defn infer-term
   "Infer the type of `t`"
@@ -287,14 +303,12 @@
   [si t]
   (cond
     (syn/lambda? t)
-    (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
-      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
+    (set-type (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
+      (syn/normalize-ty (apply-subst-ty si (type-of t))))
     (syn/application? t)
-    (with-meta (map (fn [t] (apply-subst-metadata si t)) t)
-      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
-    :else (vary-meta t (fn [me] {:ty (syn/normalize-ty
-                                     (apply-subst-ty si (get me :ty)))}))
-    ))
+    (set-type (map (fn [t] (apply-subst-metadata si t)) t)
+              (syn/normalize-ty (apply-subst-ty si (type-of t))))
+    :else (set-type t (syn/normalize-ty (apply-subst-ty si (type-of t))))))
 
 (defn elaborate-term
   "Elaborate a term with its type information"
@@ -314,10 +328,6 @@
         [:ko 'check-term {:t t :ty ty}]
         (compose-subst si si2) :as [_ si]
         [:ok (apply-subst-metadata si t) cnt])))
-
-(defn type-of
-  "Retrieve type information for an elaborated term `t`"
-  [t] (get (meta t) :ty))
 
 ;;{
 ;; Type checking and elaboration of a whole program
@@ -373,7 +383,7 @@
             [:ok [(cons t res) cnt]]))
      ['() cnt] (map vector (rest p) params)) :as [_ [tl cnt]]
     [:ko> 'elaborate-pred {:pred p}]
-    [:ok (cons (with-meta (first p) {:ty ty}) (reverse tl)) cnt])))
+    [:ok (cons (set-type (first p) ty) (reverse tl)) cnt])))
 
 (declare elaborate-clause-body)
 

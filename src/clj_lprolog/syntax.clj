@@ -11,6 +11,7 @@
 ;; A kernel lambda-term is either:
 ;; - a bound variable (identified by its De Bruijn index)
 ;; - a free (substituable) variable (identified by a symbol)
+;; - a string literal
 ;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
@@ -33,6 +34,12 @@
            (not (some #{t} reserved))))
 
 (example (free? 'A) => true)
+
+(defn string-lit?
+  "Is `t` a string litteral ?"
+  [t] (string? t))
+
+(example (string-lit? "hello") => true)
 
 (defn primitive?
   "Is `t` a primitive constant ?"
@@ -85,6 +92,7 @@
 ;; - a type variable (identified by an capitalized symbol)
 ;; - the primitive "nat" type `i`
 ;; - the primitive "prop" type `o`
+;; - the primitive "string" type `string`
 ;; - a user type
 ;; - a n-ary arrow type
 ;;}
@@ -106,6 +114,12 @@
   [t] (= t 'o))
 
 (example (prop-type? 'o) => true)
+
+(defn string-type?
+  "Is `t` the string type ?"
+  [t] (= t 'string))
+
+(example (string-type? 'string) => true)
 
 (defn user-type?
   "Is `t` a user type ?"

@@ -17,20 +17,20 @@
 (defn flatten-zero-lambda
   "Transform `t`, a lambda into its body if the lambda abstract over 0 bindings.
   Return unchanged `t` otherwise"
-  [t] (with-meta
+  [t] (typ/set-type
         (if (zero? (second t)) (nth t 2) t)
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (defn flatten-lambda
   "Flatten `t`, with `t` some nested lambdas (at least one)"
-  [t] (with-meta
+  [t] (typ/set-type
         (if (syn/lambda? (nth t 2))
         (let [lam' (flatten-lambda (nth t 2))
               n' (second lam')
               t' (nth lam' 2)]
           (list 'λ (+ (second t) n') t'))
         t)
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (example
  (flatten-lambda '(λ 2 (λ 1 (#{0} #{1})))) =>
@@ -39,28 +39,28 @@
 (defn lambda-form
   "Put a term `t` in lambda form: if it is already a lambda, return `t`,
   else add an abstraction with 0 bindings"
-  [t] (with-meta
+  [t] (typ/set-type
         (if (syn/lambda? t) t (list 'λ 0 t))
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (example (lambda-form '(A B)) => '(λ 0 (A B)))
 
 (defn flatten-one-application
   "Transform `t`, an application into its head if it is applied to 0 arguments.
   Return unchanged `t` otherwise"
-  [t] (with-meta
+  [t] (typ/set-type
         (if (= (count t) 1) (first t) t)
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (defn flatten-application
   "Flatten `t` using left associativity,
   with `t` some nested applications (at least one)"
-  [t] (with-meta
+  [t] (typ/set-type
         (if (syn/application? (first t))
           (let [hd (flatten-application (first t))]
             (concat hd (rest t)))
           t)
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (example
  (flatten-application '((A B C) D E)) => '(A B C D E))
@@ -68,9 +68,9 @@
 (defn application-form
   "Put a term `t` in an application form : if it is already an application,
   returnn `t`, else apply it to 0 arguments"
-  [t] (with-meta
+  [t] (typ/set-type
         (if (syn/application? t) t (list t))
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (example (application-form 'A) => '(A))
 
@@ -84,15 +84,15 @@
 (defn one-less-lambda
   "Remove the first binding of `t`, a lambda. Flatten if there is no binding left.
    Update typing information"
-  [t] (with-meta
+  [t] (typ/set-type
         (flatten-zero-lambda
          (list 'λ (dec (second t)) (nth t 2)))
-        {:ty (second (syn/destruct-arrow (typ/type-of t) 1))}))
+        (second (syn/destruct-arrow (typ/type-of t) 1))))
 
 (defn implicit-subst
   "Substitute `v` to the bound variable of index `n` (default to 0) in `t`"
   ([v t] (implicit-subst 0 v t))
-  ([n v t] (with-meta
+  ([n v t] (typ/set-type
             (cond
               ;; t is a bound variable
               (and (syn/bound? t) (= n (first t))) v
@@ -103,7 +103,7 @@
               (syn/application? t)
               (map (fn [t] (implicit-subst n v t)) t)
               :else t)
-            {:ty (typ/type-of t)})))
+            (typ/type-of t))))
 
 (example
  (implicit-subst 'A '((λ 2 #{2}) #{0} #{1})) => '((λ 2 A) A #{1}))
@@ -116,9 +116,9 @@
       (let [hd (first t)
             arg (second t) tl (rest (rest t))
             newhd (implicit-subst arg (one-less-lambda hd))]
-        (recur (flatten-one-application (with-meta
+        (recur (flatten-one-application (typ/set-type
                                           (cons newhd tl)
-                                          {:ty (typ/type-of t)}))))
+                                          (typ/type-of t)))))
       t)))
 
 (example
@@ -140,19 +140,19 @@
         (let [hd (if (syn/suspension? (nth abs 2))
                    ;; if the body of the abstraction is already a suspension
                    (let [[t1 ol nl e] (nth abs 2)]
-                     [(with-meta
+                     [(typ/set-type
                         (flatten-zero-lambda
                          (list 'λ (dec (second abs)) t1))
-                        {:ty (second (syn/destruct-arrow (typ/type-of abs) 1))})
+                        (second (syn/destruct-arrow (typ/type-of abs) 1)))
                       ol (dec nl) (cons [t2 (dec nl)] (rest e))])
                    ;; else
-                   [(with-meta
+                   [(typ/set-type
                       (flatten-zero-lambda
                        (list 'λ (dec (second abs)) (nth abs 2)))
-                       {:ty (second (syn/destruct-arrow (typ/type-of abs) 1))})
+                       (second (syn/destruct-arrow (typ/type-of abs) 1)))
                     1 0 (list [t2 0])]
                    )]
-          (with-meta (if (empty? tl) hd (cons hd tl)) {:ty (typ/type-of t)}))))
+          (typ/set-type (if (empty? tl) hd (cons hd tl)) (typ/type-of t)))))
 
 (examples
  (beta-step '((λ 1 #{0}) A)) => '[#{0} 1 0 ([A 0])]
@@ -163,7 +163,7 @@
 (defn rewrite-suspension
   "Apply the suspension rewriting rules. Assumes `s` is a suspension"
   [s] (let [[t ol nl e] s]
-        (with-meta
+        (typ/set-type
           (cond
             ;; r9
             (and (zero? ol) (zero? nl) (empty? e)) t
@@ -190,7 +190,7 @@
             ;; r8 : t is a suspension
             (and (syn/suspension? t) (zero? ol) (empty? e))
             (let [[t ol nl' e] t] [t ol (+ nl nl') e]))
-        {:ty (typ/type-of t)})))
+          (typ/type-of t))))
 
 (examples
  (rewrite-suspension ['(t1 t2) 2 2 '()]) => '([t1 2 2 ()] [t2 2 2 ()])
@@ -199,11 +199,11 @@
 (defn apply-suspensions
   "Recursively apply all the suspensions left in `t`"
   [t]
-  (with-meta
+  (typ/set-type
     (cond
       (syn/application? t) (map apply-suspensions t)
       (syn/suspension? t) (apply-suspensions (rewrite-suspension t))
-      :else t) {:ty (typ/type-of t)}))
+      :else t) (typ/type-of t)))
 
 (defn explicit-reduce
   "Fully beta reduce `t` using explicit substitutions"
@@ -213,9 +213,9 @@
       (syn/beta-redex? t) (recur (beta-step t))
       (syn/suspension? t) (recur (rewrite-suspension t))
       (and (syn/application? t) (syn/suspension? (first t)))
-      (recur (with-meta
+      (recur (typ/set-type
                (cons (rewrite-suspension (first t)) (rest t))
-               {:ty (typ/type-of t)}))
+               (typ/type-of t)))
       :else (apply-suspensions t))))
 
 (examples
@@ -231,7 +231,7 @@
 
 (defn simplify-term
   "Recursively simplify a term as much as possible"
-  [t] (with-meta
+  [t] (typ/set-type
         (cond
           ;; t is a beta-redex
           (syn/beta-redex? t) (simplify-term (implicit-reduce t))
@@ -244,7 +244,7 @@
           (flatten-one-application
            (flatten-application (map simplify-term t)))
           :else t)
-        {:ty (typ/type-of t)}))
+        (typ/type-of t)))
 
 (example (simplify-term '(λ 0 ((λ 0 ((λ 0 (S))))))) => 'S)
 
@@ -253,25 +253,25 @@
   [t] (-> t
           implicit-reduce ;; TODO use explicit-reduce ?
           lambda-form flatten-lambda
-           (#(with-meta (list 'λ (second %) (application-form (nth % 2)))
-               {:ty (typ/type-of %)}))
+           (#(typ/set-type (list 'λ (second %) (application-form (nth % 2)))
+                           (typ/type-of %)))
           ))
 
 (defn lift-indices
   "Lift indices of all free variables in `t` by `n`"
   ([n t] (lift-indices n 0 t))
   ([n nmin t]
-   (with-meta (cond
-                ;; t is a bound variable, but not by a later abstraction
-                (and (syn/bound? t) (>= (first t) nmin)) #{(+ (first t) n)}
-                ;; t is an abstraction
-                (syn/lambda? t)
-                (list 'λ (second t)
-                      (lift-indices n (+ nmin (second t)) (nth t 2)))
-                ;; t is an application
-                (syn/application? t) (map (fn [t] (lift-indices n nmin t)) t)
-                :else t)
-     {:ty (typ/type-of t)})))
+   (typ/set-type (cond
+                   ;; t is a bound variable, but not by a later abstraction
+                   (and (syn/bound? t) (>= (first t) nmin)) #{(+ (first t) n)}
+                   ;; t is an abstraction
+                   (syn/lambda? t)
+                   (list 'λ (second t)
+                         (lift-indices n (+ nmin (second t)) (nth t 2)))
+                   ;; t is an application
+                   (syn/application? t) (map (fn [t] (lift-indices n nmin t)) t)
+                   :else t)
+                 (typ/type-of t))))
 
 (example (lift-indices 2 '((λ 2 (#{0} #{2})) #{1}))
          => '((λ 2 (#{0} #{4})) #{3}))
@@ -281,10 +281,9 @@
   in reverse order"
   [ty] (let [n (count (syn/param-types ty))]
          (take n (iterate
-                  (fn [s] (with-meta #{(dec (first s))}
-                           {:ty (nth ty (- n (dec (first s))))}))
-                  (with-meta #{(dec n)}
-                    {:ty (nth ty 1)})))))
+                  (fn [s] (typ/set-type #{(dec (first s))}
+                                       (nth ty (- n (dec (first s))))))
+                  (typ/set-type #{(dec n)} (nth ty 1))))))
 
 (defn norm-eta
   "Eta-expansion part of the normalization of `t`"
@@ -292,12 +291,12 @@
         (if (syn/arrow-type? ty)
           (let [n (- (count ty) 2)
                 args (eta-params ty)]
-            (with-meta (list 'λ (+ n (second t))
-                             (with-meta
-                               (flatten-application
-                                (cons (lift-indices n (nth t 2)) args))
-                               {:ty (last ty)}))
-              {:ty (typ/type-of t)}))
+            (typ/set-type (list 'λ (+ n (second t))
+                                (typ/set-type
+                                 (flatten-application
+                                  (cons (lift-indices n (nth t 2)) args))
+                                 (last ty)))
+                          (typ/type-of t)))
           t)))
 
 (example

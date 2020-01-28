@@ -24,7 +24,8 @@
   (t/is (syn/proper-kernel-term? #{1}))
   (t/is (syn/proper-kernel-term? 'A))
   (t/is (syn/proper-kernel-term? '(λ 2 (#{1} #{2}))))
-  (t/is (syn/proper-kernel-term? '(A B))))
+  (t/is (syn/proper-kernel-term? '(A B)))
+  (t/is (syn/proper-kernel-term? '(print "hello world"))))
 
 ;; Tests on proper type syntax
 

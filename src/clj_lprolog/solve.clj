@@ -25,13 +25,13 @@
 (defn instantiate-term
   "Instantiate the term `t` by suffixing free-variables with `count`"
   [count t]
-  (with-meta
+  (typ/set-type
     (cond
       (syn/free? t) (instantiate-free-var count t)
       (syn/lambda? t) (list 'λ (second t) (instantiate-term count (nth t 2)))
       (syn/application? t) (map (fn [t] (instantiate-term count t)) t)
       :else t)
-    {:ty (typ/type-of t)}))
+    (typ/type-of t)))
 
 (defn instantiate-pred
   "Instantiate the predicate `p` by suffixing free-variables with `count`"
@@ -70,13 +70,13 @@
 (defn instantiatepi-term
   "Instantiate the term `t` by suffixing occurences of `x` with `count`"
   [x count t]
-  (with-meta
+  (typ/set-type
     (cond
       (and (syn/user-const? t) (= t x)) (instantiatepi-const count x)
       (syn/lambda? t) (list 'λ (second t) (instantiatepi-term x count (nth t 2)))
       (syn/application? t) (map (fn [t] (instantiatepi-term x count t)) t)
       :else t)
-    {:ty (typ/type-of t)}))
+    (typ/type-of t)))
 
 (defn instantiatepi-pred
   "Instantiate the predicate `p` by suffixing occurences of `x` with `count`"

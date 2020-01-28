@@ -33,6 +33,7 @@
   "Is `t` a kernel term ?"
   [t] (or (syn/bound? t)
           (syn/free? t)
+          (syn/string-lit? t)
           (syn/primitive? t)
           (syn/user-const? t)
           (proper-lambda? t)
@@ -105,6 +106,7 @@
   "Is `t` a user term ?"
   [t] (or (bound-or-const? t)
           (syn/free? t)
+          (syn/string-lit? t)
           (syn/primitive? t)
           (lambda? t)
           (syn/application? t)))
@@ -125,7 +127,7 @@
           [:ok t])
 
         (syn/free? t) [:ok t]
-
+        (syn/string-lit? t) [:ok t]
         (syn/primitive? t) [:ok t]
 
         (lambda? t)

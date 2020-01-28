@@ -178,7 +178,8 @@
   (t/testing "positive"
     (t/is (= :ok (typ/valid-type? '#{bool} 'bool)))
     (t/is (= :ok (typ/valid-type? '#{bool} 'i)))
-    (t/is (= :ok (typ/valid-type? '#{bool} '(-> i i bool)))))
+    (t/is (= :ok (typ/valid-type? '#{bool} '(-> i i bool))))
+    (t/is (= :ok (typ/valid-type? '#{} '(-> string o)))))
   (t/testing "negative"
     (t/is (u/ko-expr? (typ/valid-type? #{} '(-> i bool))))))
 
