@@ -17,6 +17,7 @@
                (syn/nat-type? ty) :ok
                (syn/prop-type? ty) :ok
                (syn/string-type? ty) :ok
+               (syn/int-type? ty) :ok
                (syn/user-type? ty)
                (if (contains? types ty) :ok [:ko 'check-type {:ty ty}])
                (syn/arrow-type? ty)
@@ -201,12 +202,14 @@
   "Retrieve type information for an elaborated term `t`"
   [t] (cond
         (syn/string-lit? t) 'string
+        (syn/int-lit? t) 'int
         :else (get (meta t) :ty)))
 
 (defn set-type
   "Set the type information for a term `t`"
   [t ty] (cond
            (syn/string-lit? t) t
+           (syn/int-lit? t) t
            :else (with-meta t {:ty ty})))
 
 (defn subst-infer-term
@@ -236,6 +239,9 @@
 
      ;; t is a string literal
      (syn/string-lit? t) [:ok {} 'string t cnt]
+
+     ;; t is an integer literal
+     (syn/int-lit? t) [:ok {} 'int t cnt]
 
      ;; t is a primitive
      (syn/primitive? t)

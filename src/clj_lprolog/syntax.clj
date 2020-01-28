@@ -12,6 +12,7 @@
 ;; - a bound variable (identified by its De Bruijn index)
 ;; - a free (substituable) variable (identified by a symbol)
 ;; - a string literal
+;; - an int literal
 ;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
@@ -20,7 +21,7 @@
 
 (def reserved
   "Reserved symbols"
-  '(λ ∀ => O S + *))
+  '(λ O S + *))
 
 (defn bound?
   "Is `t` a bound variable ?"
@@ -31,19 +32,26 @@
 (defn free?
   "Is `t` a free variable ?"
   [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)
+           (Character/isLetter (first (str t)))
            (not (some #{t} reserved))))
 
 (example (free? 'A) => true)
 
 (defn string-lit?
-  "Is `t` a string litteral ?"
+  "Is `t` a string literal ?"
   [t] (string? t))
 
 (example (string-lit? "hello") => true)
 
+(defn int-lit?
+  "Is `t` an integer literal ?"
+  [t] (int? t))
+
+(example (int-lit? 42) => true)
+
 (defn primitive?
   "Is `t` a primitive constant ?"
-  [t] (some? (some #{t} (nthrest reserved 2))))
+  [t] (some? (some #{t} (rest reserved))))
 
 (examples
  (primitive? 'S) => true
@@ -92,6 +100,7 @@
 ;; - a type variable (identified by an capitalized symbol)
 ;; - the primitive "nat" type `i`
 ;; - the primitive "prop" type `o`
+;; - the primitive "int" type `int`
 ;; - the primitive "string" type `string`
 ;; - a user type
 ;; - a n-ary arrow type
@@ -114,6 +123,12 @@
   [t] (= t 'o))
 
 (example (prop-type? 'o) => true)
+
+(defn int-type?
+  "Is `t` the int type ?"
+  [t] (= t 'int))
+
+(example (int-type? 'int) => true)
 
 (defn string-type?
   "Is `t` the string type ?"

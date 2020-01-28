@@ -48,6 +48,8 @@
     (t/is (u/ok-expr? (typ/subst-infer-term {} #{0} ['i] 0)))
     (t/is (= [:ok 'i] (typ/infer-term '(S (S (S O))))))
     (t/is (= [:ok 'nat] (typ/infer-term {'zero 'nat} 'zero)))
+    (t/is (= [:ok 'string] (typ/infer-term {} "hello")))
+    (t/is (= [:ok 'int] (typ/infer-term {} 42)))
     (t/is (= [:ok 'nat] (typ/infer-term {'succ '(-> nat nat)} '(succ N))))
     (t/is (= [:ok '(-> i i)] (typ/infer-term '(+ (* (S O) (S O))))))
     (t/is (u/ok-expr? (typ/infer-term '(λ 1 #{0}))))

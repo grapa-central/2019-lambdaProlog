@@ -34,6 +34,7 @@
   [t] (or (syn/bound? t)
           (syn/free? t)
           (syn/string-lit? t)
+          (syn/int-lit? t)
           (syn/primitive? t)
           (syn/user-const? t)
           (proper-lambda? t)
@@ -66,8 +67,10 @@
 (defn proper-type?
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
-          (syn/prop-type? t)
           (syn/nat-type? t)
+          (syn/prop-type? t)
+          (syn/string-type? t)
+          (syn/int-type? t)
           (syn/user-type? t)
           (proper-arrow-type? t)
           (proper-applied-type-constructor? t)))
@@ -90,7 +93,7 @@
   "Is `t` a bound variable or a constant ?"
   [t] (and (symbol? t)
            (not (some #{t} syn/reserved))
-           (not= (symbol (str/capitalize t)) t)))
+           (= (symbol (str/lower-case t)) t)))
 
 (example (bound-or-const? 'x) => true)
 
@@ -128,6 +131,7 @@
 
         (syn/free? t) [:ok t]
         (syn/string-lit? t) [:ok t]
+        (syn/int-lit? t) [:ok t]
         (syn/primitive? t) [:ok t]
 
         (lambda? t)

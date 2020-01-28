@@ -68,8 +68,10 @@
 
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
-  [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
-               [:ok (conj (apply-subst-subst s2 s1) (apply-subst-subst s1 s2))]))
+  [s1 s2]
+  (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
+       (conj (apply-subst-subst s2 s1) (apply-subst-subst s1 s2)) :as subst
+       [:ok subst]))
 
 (defn compose-subst-sets
   "Compose the sets of substitutions `s1` and `s2`.
@@ -92,7 +94,9 @@
   without occur-check"
   [substs]
   (set (filter
-        (fn [si] (not (some (fn [[v t]] (some #{v} (get-freevars t))) (seq si))))
+        (fn [si] (not (some (fn [[v t]]
+                             (and (not= v t)
+                                  (some #{v} (get-freevars t)))) (seq si))))
         substs)))
 
 ;;{
