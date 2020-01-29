@@ -229,12 +229,28 @@
 ;; Beta-reduce and eta-expand a term to get its head-normal form
 ;;}
 
+(defn literal?
+  "Check if `t` is a litteral"
+  [t] (or (syn/string-lit? t) (syn/int-lit? t)))
+
+(example (literal? 42) => true)
+
+(defn evaluable?
+  "Check if `t` is an evaluable term, that is the application of a primitive to a set of literals"
+  [t] (and (seq? t) (not (syn/arrow-type? (typ/type-of t)))
+           (syn/primitive? (first t))
+           (every? (fn [t] (or (literal? t) (evaluable? t))) (rest t))))
+
+(example (evaluable? '(+ 2 (* 4 3))) => true)
+
 (defn simplify-term
   "Recursively simplify a term as much as possible"
   [t] (typ/set-type
         (cond
           ;; t is a beta-redex
           (syn/beta-redex? t) (simplify-term (implicit-reduce t))
+          ;; t can be evaluated
+          (evaluable? t) (eval t)
           ;; t is an abstraction
           (syn/lambda? t)
           (flatten-zero-lambda

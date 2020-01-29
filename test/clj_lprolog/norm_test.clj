@@ -60,8 +60,17 @@
 
 ;; Tests on normalization
 
+(t/deftest evaluable?-test
+  (t/testing "positive"
+    (t/is (nor/evaluable? '(+ 3 4)))
+    (t/is (nor/evaluable? '(* (+ 1 2) (+ 3 4)))))
+  (t/testing "negative"
+    (t/is (not (nor/evaluable? '(+ 3 A))))
+    (t/is (not (nor/evaluable? (second (typ/elaborate-term {} '(+ 3))))))))
+
 (t/deftest simplify-term-test
   (t/is (= 'S (nor/simplify-term '(λ 0 (λ 0 S)))))
+  (t/is (= 12 (nor/simplify-term '((λ 1 (+ 5 #{0})) 7))))
   (t/is (= 'S (nor/simplify-term '(((((((((((((((((((S)))))))))))))))))))))))
 
 (t/deftest lift-indices-test

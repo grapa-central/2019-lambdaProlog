@@ -21,7 +21,7 @@
 
 (def primitives
   "Primitives of the language"
-  '(+ *))
+  '(+ - * quot mod))
 
 (def reserved
   "Reserved symbols"

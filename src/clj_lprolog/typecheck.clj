@@ -183,7 +183,8 @@
 
 (def primitive-env
   "Types of primitives"
-  { '+ '(-> int int int) '* '(-> int int int) })
+  '{ + (-> int int int) - (-> int int int) * (-> int int int)
+    quot (-> int int int) mod (-> int int int) })
 
 (defn rename-type-vars
   "Change the type variables in `ty` into type-unification variables
