@@ -71,11 +71,12 @@
   (t/is (= '((λ 1 #{2}) #{1}) (nor/lift-indices 1 '((λ 1 #{1}) #{0})))))
 
 (defn eta
-  [t] (nor/norm-eta (second (typ/elaborate-term {} t))))
+  [t] (nor/norm-eta (second (typ/elaborate-term '{succ (-> int int)} t))))
 
 (t/deftest norm-eta-test
   (t/is (= '(λ 2 #{0}) (eta '(λ 2 #{0}))))
-  (t/is (= '(λ 1 (S #{0})) (eta '(λ 0 S))))
+  (t/is (= '(λ 1 (succ #{0}))
+           (eta '(λ 0 succ))))
   (t/is (= '(λ 3 ((λ 2 (S #{0})) #{1} #{0})) (eta '(λ 1 (λ 2 (S #{0})))))))
 
 (defn normalize

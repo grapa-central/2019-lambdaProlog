@@ -46,7 +46,7 @@
               (typ/type-of t))))
 
 (example
- (subst 'A '(S O) '((λ 2 A) A B)) => '((λ 2 (S O)) (S O) B))
+ (subst 'A 42 '((λ 2 A) A B)) => '((λ 2 42) 42 B))
 
 (defn apply-subst
   "Apply a substitution `si` to a type `ty`"
@@ -272,8 +272,8 @@
                     (normal-form-arg e2 (second t2) (typ/type-of t2))])
                  (map vector (tail t1) (tail t2)))) subst))))))
 
-(example (simpl '([(λ 0 (A)) (λ 0 (S))] [(λ 2 (A (B))) (λ 2 (A #{1}))])) =>
-         '[:ok ([(λ 2 (B)) (λ 2 (#{1}))]) {A S}])
+(example (simpl '([(λ 0 (A)) (λ 0 (succ))] [(λ 2 (A (B))) (λ 2 (A #{1}))])) =>
+         '[:ok ([(λ 2 (B)) (λ 2 (#{1}))]) {A succ}])
 
 (defn fresh-unknown [count] (symbol (str "H" count)))
 

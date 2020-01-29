@@ -14,7 +14,6 @@
 (defn valid-type?
   "Check that `ty` is built from primitive and user-defined types"
   [types ty] (cond
-               (syn/nat-type? ty) :ok
                (syn/prop-type? ty) :ok
                (syn/string-type? ty) :ok
                (syn/int-type? ty) :ok
@@ -30,7 +29,7 @@
                  [:ko 'check-type {:ty ty}])
                ))
 
-(example (valid-type? '#{bool} '(-> i bool)) => :ok)
+(example (valid-type? '#{bool} '(-> int bool)) => :ok)
 
 (defn check-const
   "Check that the constant `c` use types declared in `types`"
@@ -184,7 +183,7 @@
 
 (def primitive-env
   "Types of primitives"
-  { 'O 'i 'S '(-> i i) '+ '(-> i i i) '* '(-> i i i) })
+  { '+ '(-> int int int) '* '(-> int int int) })
 
 (defn rename-type-vars
   "Change the type variables in `ty` into type-unification variables
@@ -299,10 +298,10 @@
         [:ok ty])))
 
 (examples
- (infer-term '+) => [:ok '(-> i i i)]
+ (infer-term '+) => [:ok '(-> int int int)]
  (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty1)]
  (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 Ty2 Ty2)]
- (infer-term '((λ 1 #{0}) (S O))) => [:ok 'i])
+ (infer-term '((λ 1 #{0}) 0)) => [:ok 'int])
 
 (defn apply-subst-metadata
   "Apply a substitution `si` in the metadata of `t`"
@@ -469,8 +468,9 @@
        [:ok t vars]))
 
 (example
- (elaborate-and-freevar-pred {} {'even ['(-> i o)]} '(even (S N)))
- => [:ok '(even (S N)) {'N 'i}])
+ (elaborate-and-freevar-pred '{succ (-> int int)} {'even ['(-> int o)]}
+                             '(even (succ N)))
+ => [:ok '(even (succ N)) {'N 'int}])
 
 (declare check-freevar-clause-body)
 
@@ -514,9 +514,9 @@
        [:ok c vars]))
 
 (example
- (elaborate-and-freevar-clause {} {} {'even ['(-> i o)]}
-                               ['(even (S (S N))) '((even N))]) =>
- [:ok ['(even (S (S N))) '((even N))] {'N 'i}])
+ (elaborate-and-freevar-clause {} '{succ (-> int int)} {'even ['(-> int o)]}
+                               ['(even (succ (succ N))) '((even N))]) =>
+ [:ok ['(even (succ (succ N))) '((even N))] {'N 'int}])
 
 (defn elaborate-program
   "Elaborate the whole program `prog`"

@@ -19,9 +19,13 @@
 ;; - a suspension (used for explicit substitutions)
 ;;}
 
+(def primitives
+  "Primitives of the language"
+  '(+ *))
+
 (def reserved
   "Reserved symbols"
-  '(λ O S + *))
+  (concat '(λ) primitives))
 
 (defn bound?
   "Is `t` a bound variable ?"
@@ -51,11 +55,9 @@
 
 (defn primitive?
   "Is `t` a primitive constant ?"
-  [t] (some? (some #{t} (rest reserved))))
+  [t] (some? (some #{t} primitives)))
 
-(examples
- (primitive? 'S) => true
- (primitive? '+) => true)
+(example (primitive? '+) => true)
 
 (defn user-const?
   "Is `t` a user constant ?"
@@ -98,7 +100,6 @@
 ;;
 ;; A type is either
 ;; - a type variable (identified by an capitalized symbol)
-;; - the primitive "nat" type `i`
 ;; - the primitive "prop" type `o`
 ;; - the primitive "int" type `int`
 ;; - the primitive "string" type `string`
@@ -111,12 +112,6 @@
   [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)))
 
 (example (type-var? 'A) => true)
-
-(defn nat-type?
-  "Is `t` the nat type ?"
-  [t] (= t 'i))
-
-(example (nat-type? 'i) => true)
 
 (defn prop-type?
   "Is `t` the proposition type ?"

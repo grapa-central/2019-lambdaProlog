@@ -46,23 +46,23 @@
 (t/deftest infer-term-test
   (t/testing "positive"
     (t/is (u/ok-expr? (typ/subst-infer-term {} #{0} ['i] 0)))
-    (t/is (= [:ok 'i] (typ/infer-term '(S (S (S O))))))
+    (t/is (= [:ok 'int] (typ/infer-term 42)))
     (t/is (= [:ok 'nat] (typ/infer-term {'zero 'nat} 'zero)))
     (t/is (= [:ok 'string] (typ/infer-term {} "hello")))
     (t/is (= [:ok 'int] (typ/infer-term {} 42)))
     (t/is (= [:ok 'nat] (typ/infer-term {'succ '(-> nat nat)} '(succ N))))
-    (t/is (= [:ok '(-> i i)] (typ/infer-term '(+ (* (S O) (S O))))))
+    (t/is (= [:ok '(-> int int)] (typ/infer-term '(+ (* 2 4)))))
     (t/is (u/ok-expr? (typ/infer-term '(λ 1 #{0}))))
     (t/is (u/ok-expr? (typ/infer-term '(λ 2 #{1}))))
     (t/is (u/ok-expr? (typ/infer-term '((λ 2 #{1}) O))))
-    (t/is (= [:ok '(-> i i)] (typ/infer-term '((λ 2 (+ #{0} #{1})) O))))
-    (t/is (= [:ok 'i] (typ/infer-term '(λ 0 (S O)))))
+    (t/is (= [:ok '(-> int int)] (typ/infer-term '((λ 2 (+ #{0} #{1})) 2))))
+    (t/is (= [:ok 'int] (typ/infer-term '(λ 0 4))))
     (t/is (= [:ok '(-> goal goal o)] (typ/infer-term tacconsts '(repeattac Tac))))
     (t/is (= [:ok '(-> goal goal o)]
              (typ/infer-term tacconsts '(then Tac (repeattac Tac))))))
   (t/testing "negative"
-    (t/is (u/ko-expr? (typ/infer-term '(S S))))
-    (t/is (u/ko-expr? (typ/infer-term '((λ 1 (+ #{0} #{0})) S))))))
+    (t/is (u/ko-expr? (typ/infer-term '(12 12))))
+    (t/is (u/ko-expr? (typ/infer-term '((λ 1 (+ #{0} #{0})) (+ 12)))))))
 
 (t/deftest elaborate-term-test
   (t/testing "elaborated terms stay the same"
@@ -97,41 +97,41 @@
 
 (t/deftest get-freevar-types-test
   (t/testing "positive"
-    (t/is (= [:ok {'A 'o}] (elab-and-freevars '(λ 1 A) '(-> i o))))
-    (t/is (= [:ok {'A 'i}] (elab-and-freevars '((λ 1 A) A) 'i)))
-    (t/is (= [:ok {'A 'i 'B 'i}]
-             (elab-and-freevars '((λ 2 (+ #{0} #{1})) A B) 'i))))
+    (t/is (= [:ok {'A 'o}] (elab-and-freevars '(λ 1 A) '(-> int o))))
+    (t/is (= [:ok {'A 'int}] (elab-and-freevars '((λ 1 A) A) 'int)))
+    (t/is (= [:ok {'A 'int 'B 'int}]
+             (elab-and-freevars '((λ 2 (+ #{0} #{1})) A B) 'int))))
   (t/testing "negative"
-    (t/is (u/ko-expr? (elab-and-freevars '((λ 1 (+ (A O) #{0})) A) 'i)))))
+    (t/is (u/ko-expr? (elab-and-freevars '((λ 1 (+ (A 0) #{0})) A) 'int)))))
 
 (t/deftest check-pred-test
   (t/testing "even"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> i o))
-      (t/is (= {'A 'i}
+      (cor/defpred 'even '(-> int o))
+      (t/is (= '{A int}
                (nth
                 (typ/elaborate-and-freevar-pred
                  {} (deref cor/progpreds) '(even A)) 2)))))
   (t/testing "predicate"
     (do
       (cor/start)
-      (cor/defpred 'pred '(-> (-> i o) i o))
+      (cor/defpred 'pred '(-> (-> int o) int o))
       (t/is (= {'F 'o}
                (nth
                 (typ/elaborate-and-freevar-pred
-                 {} (deref cor/progpreds) '(pred (λ 1 F) (S O))) 2)))))
+                 {} (deref cor/progpreds) '(pred (λ 1 F) 42)) 2)))))
   (t/testing "predicate fail"
     (do
       (cor/start)
-      (cor/defpred 'pred '(-> (-> i o) i o))
+      (cor/defpred 'pred '(-> (-> int o) int o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-pred
               {} (deref cor/progpreds) '(pred (λ 1 F) F))))))
   (t/testing "used twice"
     (do
       (cor/start)
-      (cor/defpred 'twice '(-> i i o))
+      (cor/defpred 'twice '(-> int int o))
       (t/is (u/ok-expr?
              (typ/elaborate-and-freevar-pred
               {} (deref cor/progpreds) '(twice ((λ 1 O) A) A)))))))
@@ -140,47 +140,50 @@
   (t/testing "oddeven"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> i o))
-      (cor/defpred 'odd '(-> i o))
-      (t/is (= {'N 'i}
+      (cor/defpred 'even '(-> int o))
+      (cor/defpred 'odd '(-> int o))
+      (t/is (= {'N 'int}
                (nth
                 (typ/elaborate-and-freevar-clause
-                 {} {} (deref cor/progpreds) '((even (S N)) ((odd N)))) 2)))))
+                 #{} '{succ (-> int int)} (deref cor/progpreds)
+                 '((even (succ N)) ((odd N)))) 2)))))
   (t/testing "pred"
     (do
       (cor/start)
-      (cor/defpred 'applypred '(-> (-> i o) i o))
-      (t/is (= {'P '(-> i o) 'N 'i}
+      (cor/defpred 'applypred '(-> (-> int o) int o))
+      (t/is (= {'P '(-> int o) 'N 'int}
                (nth
                 (typ/elaborate-and-freevar-clause
                  {} {} (deref cor/progpreds) '((applypred P N) ((P N)))) 2)))))
   (t/testing "incoherent"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> i o))
+      (cor/defpred 'even '(-> int o))
       (cor/defpred 'odd '(-> o o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-clause
-              {} {} (deref cor/progpreds) '((even (S N)) ((odd N)))))))))
+              {} {} (deref cor/progpreds) '((even N) ((odd N)))))))))
 
 (t/deftest elaborate-program-test
   (t/testing "oddeven"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> i o))
-      (cor/defpred 'odd '(-> i o))
-      (cor/addclause '((even O)))
-      (cor/addclause '((even (S N)) :- (odd N)))
-      (cor/addclause '((odd (S O))))
-      (cor/addclause '((odd (S N)) :- (even N)))
+      (cor/defpred 'even '(-> int o))
+      (cor/defpred 'odd '(-> int o))
+      (cor/defconst 'succ '(-> int int))
+      (cor/addclause '((even 0)))
+      (cor/addclause '((even (succ N)) :- (odd N)))
+      (cor/addclause '((odd 1)))
+      (cor/addclause '((odd (succ N)) :- (even N)))
       (t/is (= [:ok (deref cor/progpreds)]
-               (typ/elaborate-program {} {} (deref cor/progpreds)))))))
+               (typ/elaborate-program {} (deref cor/progconsts)
+                                      (deref cor/progpreds)))))))
 
 (t/deftest valid-type?-test
   (t/testing "positive"
     (t/is (= :ok (typ/valid-type? '#{bool} 'bool)))
-    (t/is (= :ok (typ/valid-type? '#{bool} 'i)))
-    (t/is (= :ok (typ/valid-type? '#{bool} '(-> i i bool))))
+    (t/is (= :ok (typ/valid-type? '#{bool} 'int)))
+    (t/is (= :ok (typ/valid-type? '#{bool} '(-> int int bool))))
     (t/is (= :ok (typ/valid-type? '#{} '(-> string o)))))
   (t/testing "negative"
     (t/is (u/ko-expr? (typ/valid-type? #{} '(-> i bool))))))
@@ -189,11 +192,13 @@
   (t/testing "oddeven"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> i o))
-      (cor/defpred 'odd '(-> i o))
-      (cor/addclause '((even O)))
-      (cor/addclause '((even (S N)) :- (odd N)))
-      (cor/addclause '((odd (S O))))
-      (cor/addclause '((odd (S N)) :- (even N)))
+      (cor/defconst 'succ '(-> int int))
+      (cor/defpred 'even '(-> int o))
+      (cor/defpred 'odd '(-> int o))
+      (cor/addclause '((even 0)))
+      (cor/addclause '((even (succ N)) :- (odd N)))
+      (cor/addclause '((odd (succ 0))))
+      (cor/addclause '((odd (succ N)) :- (even N)))
       (t/is (= [:ok (deref cor/progpreds)]
-               (typ/elaborate-and-check-program #{} {} (deref cor/progpreds)))))))
+               (typ/elaborate-and-check-program #{} '{succ (-> int int)}
+                                                (deref cor/progpreds)))))))

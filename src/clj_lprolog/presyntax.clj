@@ -67,7 +67,6 @@
 (defn proper-type?
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
-          (syn/nat-type? t)
           (syn/prop-type? t)
           (syn/string-type? t)
           (syn/int-type? t)
