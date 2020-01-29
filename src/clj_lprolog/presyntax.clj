@@ -35,6 +35,7 @@
           (syn/free? t)
           (syn/string-lit? t)
           (syn/int-lit? t)
+          (syn/boolean-lit? t)
           (syn/primitive? t)
           (syn/user-const? t)
           (proper-lambda? t)
@@ -70,6 +71,7 @@
           (syn/prop-type? t)
           (syn/string-type? t)
           (syn/int-type? t)
+          (syn/boolean-type? t)
           (syn/user-type? t)
           (proper-arrow-type? t)
           (proper-applied-type-constructor? t)))
@@ -131,6 +133,7 @@
         (syn/free? t) [:ok t]
         (syn/string-lit? t) [:ok t]
         (syn/int-lit? t) [:ok t]
+        (syn/boolean-lit? t) [:ok t]
         (syn/primitive? t) [:ok t]
 
         (lambda? t)
@@ -233,7 +236,6 @@
 
 (defn user-const-dec?
   "Is `c` a well formed constant declaration with type `ty`"
-  [c ty] (and (symbol? c) (= (symbol (str/lower-case c)) c)
-              (proper-type? ty)))
+  [c ty] (and (syn/user-const? c) (proper-type? ty)))
 
 (example (user-const-dec? 'ni '(list A)) => true)

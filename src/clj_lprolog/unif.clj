@@ -50,7 +50,8 @@
 
 (defn apply-subst
   "Apply a substitution `si` to a type `ty`"
-  [si term] (reduce (fn [term [var t]] (subst var t term)) term si))
+  [si term] (nor/simplify-term
+             (reduce (fn [term [var t]] (subst var t term)) term si)))
 
 (defn subst-clash?
   "Check if there is a clash between `s1` and `s2`"
@@ -64,7 +65,7 @@
 (defn apply-subst-subst
   "Apply `s1` to every value of `s2`"
   [s1 s2] (u/map-of-pair-list
-           (map (fn [[k term]] [k (nor/simplify-term (apply-subst s1 term))]) s2)))
+           (map (fn [[k term]] [k (apply-subst s1 term)]) s2)))
 
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"

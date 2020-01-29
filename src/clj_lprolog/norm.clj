@@ -231,7 +231,7 @@
 
 (defn literal?
   "Check if `t` is a litteral"
-  [t] (or (syn/string-lit? t) (syn/int-lit? t)))
+  [t] (or (syn/string-lit? t) (syn/int-lit? t) (syn/boolean-lit? t)))
 
 (example (literal? 42) => true)
 

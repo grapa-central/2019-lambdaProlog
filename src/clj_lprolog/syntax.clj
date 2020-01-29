@@ -13,6 +13,7 @@
 ;; - a free (substituable) variable (identified by a symbol)
 ;; - a string literal
 ;; - an int literal
+;; - a boolean literal (true or false)
 ;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
@@ -21,7 +22,10 @@
 
 (def primitives
   "Primitives of the language"
-  '(+ - * quot mod))
+  '(+ - * quot mod
+      and or
+      = not=
+      zero? <= < >= >))
 
 (def reserved
   "Reserved symbols"
@@ -53,6 +57,12 @@
 
 (example (int-lit? 42) => true)
 
+(defn boolean-lit?
+  "Is `t` a boolean literal ?"
+  [t] (boolean? t))
+
+(example (boolean-lit? true) => true)
+
 (defn primitive?
   "Is `t` a primitive constant ?"
   [t] (some? (some #{t} primitives)))
@@ -61,7 +71,8 @@
 
 (defn user-const?
   "Is `t` a user constant ?"
-  [t] (and (symbol? t) (= (symbol (str/lower-case t)) t)))
+  [t] (and (symbol? t) (= (symbol (str/lower-case t)) t)
+           (not (some #{t} reserved))))
 
 (example (user-const? 'zero) => true)
 
@@ -103,6 +114,7 @@
 ;; - the primitive "prop" type `o`
 ;; - the primitive "int" type `int`
 ;; - the primitive "string" type `string`
+;; - the primitive "boolean" type `boolean`
 ;; - a user type
 ;; - a n-ary arrow type
 ;;}
@@ -124,6 +136,12 @@
   [t] (= t 'int))
 
 (example (int-type? 'int) => true)
+
+(defn boolean-type?
+  "Is `t` the boolean type ?"
+  [t] (= t 'boolean))
+
+(example (boolean-type? 'boolean) => true)
 
 (defn string-type?
   "Is `t` the string type ?"
@@ -202,7 +220,7 @@
 
 (defn pred?
   "Is `t` a predicate (either defined or free variable) ?"
-  [t] (symbol? t))
+  [t] (and (symbol? t) (not (some #{t} reserved))))
 
 (example (pred? 'even) => true)
 

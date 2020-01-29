@@ -17,6 +17,7 @@
                (syn/prop-type? ty) :ok
                (syn/string-type? ty) :ok
                (syn/int-type? ty) :ok
+               (syn/boolean-type? ty) :ok
                (syn/user-type? ty)
                (if (contains? types ty) :ok [:ko 'check-type {:ty ty}])
                (syn/arrow-type? ty)
@@ -184,7 +185,12 @@
 (def primitive-env
   "Types of primitives"
   '{ + (-> int int int) - (-> int int int) * (-> int int int)
-    quot (-> int int int) mod (-> int int int) })
+    quot (-> int int int) mod (-> int int int)
+    and (-> boolean boolean boolean) or (-> boolean boolean boolean)
+    = (-> A A boolean) not= (-> A A boolean)
+    zero? (-> int boolean)
+    <= (-> int int boolean) < (-> int int boolean)
+    >= (-> int int boolean) > (-> int int boolean)})
 
 (defn rename-type-vars
   "Change the type variables in `ty` into type-unification variables
@@ -203,6 +209,7 @@
   [t] (cond
         (syn/string-lit? t) 'string
         (syn/int-lit? t) 'int
+        (syn/boolean-lit? t) 'boolean
         :else (get (meta t) :ty)))
 
 (defn set-type
@@ -210,6 +217,7 @@
   [t ty] (cond
            (syn/string-lit? t) t
            (syn/int-lit? t) t
+           (syn/boolean-lit? t) t
            :else (with-meta t {:ty ty})))
 
 (defn subst-infer-term
@@ -243,10 +251,13 @@
      ;; t is an integer literal
      (syn/int-lit? t) [:ok {} 'int t cnt]
 
+     ;; t is a boolean literal
+     (syn/boolean-lit? t) [:ok {} 'boolean t cnt]
+
      ;; t is a primitive
      (syn/primitive? t)
-     (ok> (get primitive-env t) :as ty
-          [:ok {} ty (set-type t ty) cnt])
+     (ok> (rename-type-vars cnt (get primitive-env t)) :as ty
+          [:ok {} ty (set-type t ty) (inc cnt)])
 
      ;; t is a user constant
      (syn/user-const? t)
