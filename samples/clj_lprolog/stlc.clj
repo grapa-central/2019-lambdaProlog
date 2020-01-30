@@ -2,6 +2,7 @@
   (:require [clj-lprolog.core :as lp]))
 
 ;; Simply-Typed-Lambda-Calculus
+;; The more complete PCF language is available in the pcf/ folder
 
 ;; The terms are based on λProlog user terms
 (lp/deftype 'term)
