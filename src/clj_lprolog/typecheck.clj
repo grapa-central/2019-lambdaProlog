@@ -329,9 +329,11 @@
 
 (defn elaborate-term
   "Elaborate a term with its type information"
-  ([consts t]
-   (ok> (subst-infer-term consts t) :as [_ si _ t]
-        [:ok (apply-subst-metadata si t)])))
+  ([consts t] (ok> (elaborate-term consts t 0) :as [_ t cnt]
+                   [:ok t]))
+  ([consts t cnt]
+   (ok> (subst-infer-term consts t cnt) :as [_ si _ t cnt]
+        [:ok (apply-subst-metadata si t) cnt])))
 
 (defn check-and-elaborate-term
   "Check that `t` has type `ty`,
@@ -415,13 +417,18 @@
      (check-const types [c ty]) :as _
      (elaborate-clause-body
       types (assoc consts c ty) prog (nth g 2) cnt) :as [_ body]
-     [:ok (list 'Π (second g) body)])
+     [:ok (list 'Π (second g) body) cnt])
     ;; The goal is an implication
     (syn/imp? g)
     (ok>
      (elaborate-pred consts prog (second g) cnt) :as [_ hd cnt]
      (elaborate-clause-body types consts prog (nth g 2) cnt) :as [_ tl cnt]
-     [:ok (list '=> hd tl)])
+     [:ok (list '=> hd tl) cnt])
+    ;; The goal is a print directive
+    (syn/print? g)
+    (ok>
+     (elaborate-term consts (second g) cnt) :as [_ t cnt]
+     [:ok (list 'print t) cnt])
     ;; The goal is an applied predicate
     (syn/applied-pred? g) (elaborate-pred consts prog g cnt)
     ;; Either a non well-formed term, or we forgot to implement something :p
@@ -468,8 +475,7 @@
                                (combine-env e1 e2)))
                 (if (syn/free? (first t)) {(first t) ty} {})
                 (rest t))
-   [:ko> 'check-freevar-pred {:pred t}]
-   ))
+   [:ko> 'check-freevar-pred {:pred t}]))
 
 (defn elaborate-and-freevar-pred
   "Elaborate an applied predicate `t`, and get its freevar types,
@@ -497,6 +503,10 @@
     (ok> (check-freevar-pred (second g)) :as [_ fvt2]
          (combine-env fvt fvt2) :as [_ fvt]
          (check-freevar-clause-body (nth g 2) fvt))
+    ;; The goal is a print directive
+    (syn/print? g)
+    (ok> (get-freevar-types (second g)) :as [_ fvt2]
+         (combine-env fvt fvt2))
     ;; The goal is an applied predicate
     (syn/applied-pred? g)
     (ok> (check-freevar-pred g) :as [_ fvt2]

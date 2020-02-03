@@ -121,6 +121,12 @@
   (t/testing "negative"
     (t/is (not (syn/applied-pred? '(() O))))))
 
+(t/deftest print?-test
+  (t/testing "positive"
+    (t/is (syn/print? '(print A))))
+  (t/testing "negative"
+    (t/is (not (syn/print? '(prin A))))))
+
 (t/deftest clause-body?-test
   (t/testing "positive"
     (t/is (syn/clause-body? '((even N))))

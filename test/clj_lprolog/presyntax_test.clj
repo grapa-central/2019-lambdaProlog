@@ -90,6 +90,11 @@
     (t/is (not (syn/user-type-dec? '(list (list A)))))
     (t/is (not (syn/user-type-dec? '(pair a b))))))
 
+(t/deftest parse-goal-test
+  (t/is (u/ok-expr? (syn/parse-goal '(even O))))
+  (t/is (u/ok-expr? (syn/parse-goal '(Π (n :> i) (=> (P n) (P (S (S n))))))))
+  (t/is (u/ok-expr? (syn/parse-goal '(print (λ [x] x))))))
+
 (t/deftest parse-clause-test
   (t/testing "positive"
     (t/is (u/ok-expr? (syn/parse-clause '((even O)))))

@@ -174,13 +174,18 @@
              (solve-body prog [si (concat req1 req2)] (inc cnt)))
         ;; Implication : add a dynamic clause to the program
         (syn/imp? (first req))
-        (ok> (uni/apply-subst si (second (first req))) :as assump
+        (ok> (second (first req)) :as assump
              (nth (first req) 2) :as req1
              (rest req) :as req2
              (get prog (first assump)) :as [ty clauses]
              (cons [assump '()] clauses) :as clauses
              (assoc prog (first assump) [ty clauses]) :as prog
              (solve-body prog [si (concat req1 req2)] (inc cnt)))
+        ;; Print : well, print the term (after applying substitution)
+        (syn/print? (first req))
+        (ok> (second (first req)) :as t
+             (println (uni/apply-subst si t))
+             (solve-body prog [si (rest req)] cnt))
         ;; Solve an applied predicate
         (syn/applied-pred? (first req)) (solve prog [si req] cnt)))
 

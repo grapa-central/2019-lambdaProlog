@@ -216,6 +216,7 @@
 ;; - An applied predicate
 ;; - A pi abstraction : Π (x :> ty) body
 ;; - An implication : p => body
+;; - A print directive : print t
 ;;}
 
 (defn pred?
@@ -241,6 +242,10 @@
   [t] (and (seq? t) (> (count t) 2) (= 'Π (first t))))
 
 (example (pi? '(Π (x :> term) (=> (infer x A) (infer (M x) B)))) => true)
+
+(defn print?
+  "Is `t` a print directive ?"
+  [t] (and (seq? t) (= (count t) 2) (= 'print (first t))))
 
 (defn clause-body?
   "Is `t` a clause body ?"

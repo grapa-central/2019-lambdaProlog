@@ -146,7 +146,7 @@
                (nth
                 (typ/elaborate-and-freevar-clause
                  #{} '{succ (-> int int)} (deref cor/progpreds)
-                 '((even (succ N)) ((odd N)))) 2)))))
+                 '((even (succ N)) ((print N) (odd N)))) 2)))))
   (t/testing "pred"
     (do
       (cor/start)

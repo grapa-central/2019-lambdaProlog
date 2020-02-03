@@ -183,20 +183,25 @@
 (defn parse-goal
   "Parse one of the goals `g` in a clause"
   [g] (cond
-        ;; The body is a pi-abstraction
+        ;; The goal is a pi-abstraction
         (syn/pi? g)
         (ok>
          (when (not (proper-typed-binding? (second g))))
          [:ko 'parse-goal {:goal g}]
          (parse-clause-body (nthrest g 2)) :as [_ body]
          [:ok (list 'Π (second g) body)])
-        ;; The body is an implication
+        ;; The goal is an implication
         (syn/imp? g)
         (ok>
          (parse-applied-pred (second g)) :as [_ hd]
          (parse-clause-body (nthrest g 2)) :as [_ body]
          [:ok (list '=> hd body)])
-        ;; The first term of the body is an applied predicate
+        ;; The goal is a print directive
+        (syn/print? g)
+        (ok>
+         (parse (second g)) :as [_ t]
+         [:ok (list 'print t)])
+        ;; The goal is an applied predicate
         (syn/applied-pred? g) (parse-applied-pred g)
         :else [:ko 'parse-goal {:goal g}]))
 
