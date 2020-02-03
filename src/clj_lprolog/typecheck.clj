@@ -429,6 +429,11 @@
     (ok>
      (elaborate-term consts (second g) cnt) :as [_ t cnt]
      [:ok (list 'print t) cnt])
+    ;; The goal is a read directive
+    (syn/read? g)
+    (ok>
+     (elaborate-term consts (second g) cnt) :as [_ t cnt]
+     [:ok (list 'read t) cnt])
     ;; The goal is an applied predicate
     (syn/applied-pred? g) (elaborate-pred consts prog g cnt)
     ;; Either a non well-formed term, or we forgot to implement something :p
@@ -507,6 +512,10 @@
     (syn/print? g)
     (ok> (get-freevar-types (second g)) :as [_ fvt2]
          (combine-env fvt fvt2))
+    ;; The goal is a read directive
+    (syn/read? g)
+    (ok> (get-freevar-types (second g)) :as [_ fvt2]
+         (combine-env fvt fvt2))
     ;; The goal is an applied predicate
     (syn/applied-pred? g)
     (ok> (check-freevar-pred g) :as [_ fvt2]
@@ -556,6 +565,8 @@
                    (apply-freevar-types-clause-body vars (nth g 2)))
              (syn/print? g)
              (list 'print (apply-freevar-types vars (second g)))
+             (syn/read? g)
+             (list 'read (apply-freevar-types vars (second g)))
              (syn/applied-pred? g) (apply-freevar-types vars g)))
 
 (defn apply-freevar-types-clause-body

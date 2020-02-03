@@ -247,6 +247,10 @@
   "Is `t` a print directive ?"
   [t] (and (seq? t) (= (count t) 2) (= 'print (first t))))
 
+(defn read?
+  "Is `t` a read directive ?"
+  [t] (and (seq? t) (= (count t) 2) (= 'read (first t)) (free? (second t))))
+
 (defn clause-body?
   "Is `t` a clause body ?"
   [t] (and (seq? t) (not (empty? t))))

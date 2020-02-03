@@ -123,9 +123,16 @@
 
 (t/deftest print?-test
   (t/testing "positive"
-    (t/is (syn/print? '(print A))))
+    (t/is (syn/print? '(print (λ [x] x)))))
   (t/testing "negative"
     (t/is (not (syn/print? '(prin A))))))
+
+(t/deftest read?-test
+  (t/testing "positive"
+    (t/is (syn/read? '(read A))))
+  (t/testing "negative"
+    (t/is (not (syn/read? '(rea A))))
+    (t/is (not (syn/read? '(read (λ [x] x)))))))
 
 (t/deftest clause-body?-test
   (t/testing "positive"

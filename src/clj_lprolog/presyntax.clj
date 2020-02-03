@@ -201,6 +201,8 @@
         (ok>
          (parse (second g)) :as [_ t]
          [:ok (list 'print t)])
+        ;; The goal is a read directive
+        (syn/read? g) [:ok g]
         ;; The goal is an applied predicate
         (syn/applied-pred? g) (parse-applied-pred g)
         :else [:ko 'parse-goal {:goal g}]))
