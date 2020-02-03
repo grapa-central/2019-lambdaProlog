@@ -528,11 +528,51 @@
        (check-freevar-clause-body (second c) fvt)
        [:ko> 'check-freevar-clause {:clause c :fvt fvt}]))
 
+(defn apply-freevar-types
+  "Propagate unified freevar types into the term `t`"
+  [vars t] (cond
+             (syn/free? t)
+             (if-let [ty (get vars t)] (set-type t (syn/normalize-ty ty)) t)
+             (syn/lambda? t)
+             (set-type
+              (list 'λ (second t) (apply-freevar-types vars (nth t 2)))
+              (type-of t))
+             (syn/application? t)
+             (set-type
+              (map (fn [t] (apply-freevar-types vars t)) t)
+              (type-of t))
+             :else t))
+
+(declare apply-freevar-types-clause-body)
+
+(defn apply-freevar-types-goal
+  "Propagate unified freevar types into the goal `g`"
+  [vars g] (cond
+             (syn/pi? g)
+             (list 'Π (second g)
+                   (apply-freevar-types-clause-body vars (nth g 2)))
+             (syn/imp? g)
+             (list '=> (apply-freevar-types vars (second g))
+                   (apply-freevar-types-clause-body vars (nth g 2)))
+             (syn/print? g)
+             (list 'print (apply-freevar-types vars (second g)))
+             (syn/applied-pred? g) (apply-freevar-types vars g)))
+
+(defn apply-freevar-types-clause-body
+  "Propagate unified freevar types into the clause body `b`"
+  [vars b] (map (fn [g] (apply-freevar-types-goal vars g)) b))
+
+(defn apply-freevar-types-clause
+  "Propagate unified freevar types into the clause `c`"
+  [vars [hd body]] [(apply-freevar-types vars hd)
+                    (apply-freevar-types-clause-body vars body)])
+
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
   [types consts prog c]
   (ok> (elaborate-clause types consts prog c) :as [_ c]
        (check-freevar-clause prog c) :as [_ vars]
+       (apply-freevar-types-clause vars c) :as c
        [:ok c vars]))
 
 (example
@@ -556,12 +596,13 @@
   [types consts prog]
   (ok> (check-consts types consts) :as _
        (check-preds types prog) :as _
-       (elaborate-program types consts prog) :as [_ prog]
-       (u/every-ok?
-        (fn [[_ [_ clauses]]]
-          (u/every-ok? (fn [c] (check-freevar-clause prog c))
-                       clauses)) prog)
-       [:ok prog]))
+       (u/ok-map
+        (fn [[pred [ty clauses]]]
+          (ok> (u/ok-map (fn [c] (elaborate-and-freevar-clause types consts prog c))
+                         clauses) :as [_ clauses]
+               [:ok [pred [ty (map (fn [[t]] t) clauses)]]]))
+        prog) :as [_ prog]
+       [:ok (u/map-of-pair-list (map (fn [[c]] c) prog))]))
 
 (defn type-check-program
   "Returns true if the program is correctly typed, false otherwise"
