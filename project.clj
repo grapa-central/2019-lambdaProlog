@@ -1,4 +1,4 @@
-(defproject clj-lprolog "0.1.0-SNAPSHOT"
+(defproject clj-lprolog "1.0.0"
   :description "A Lambda-prolog interpreter in Clojure"
   :license {:name "MIT Licence"
             :url "http://opensource.org/licenses/MIT"}
