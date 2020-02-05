@@ -93,4 +93,4 @@
          (typ/elaborate-and-freevar-pred
           (deref progconsts) (deref progpreds) req) :as [_ req _]
          [:ko> 'typecheck-request {:req req}]
-         (sol/solve (deref progpreds) req)))
+         (sol/solve (deref progconsts) (deref progpreds) req)))

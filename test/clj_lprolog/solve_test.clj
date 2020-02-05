@@ -44,12 +44,12 @@
 (t/deftest solve-test
   (t/testing "oddeven"
     (t/is (= '[:ok {N (succ zero)}]
-             (sol/solve
+             (sol/solve {}
               '{even [(-> nat o) {(even zero) (),
                                   (even (succ (succ N))) ((even N))}]}
               '(even (succ (succ (succ N)))))))
     (t/is (= '[:ok {N zero}]
-             (sol/solve
+             (sol/solve {}
               '{even [(-> nat o) {(even zero) (),
                                   (even (succ N)) ((odd N))}]
                 odd [(-> nat o) {(odd (succ zero)) (),
@@ -57,18 +57,20 @@
               '(even (succ (succ N)))))))
   (t/testing "lists"
     (t/is (u/ok-expr?
-           (sol/solve listsprog '(member zero (cs X (cs Y ni))))))
+           (sol/solve {} listsprog '(member zero (cs X (cs Y ni))))))
     (t/is (u/ko-expr?
-           (sol/solve listsprog
+           (sol/solve {} listsprog
                       '(member (succ zero) (cs zero (cs zero ni))))))
     (t/is (u/ok-expr?
-           (sol/solve listsprog
+           (sol/solve {} listsprog
                       '(append (cs zero ni) L (cs zero (cs (succ zero) ni))))))
     (t/is (u/ko-expr?
-           (sol/solve listsprog '(append (cs zero ni) L L))))
+           (sol/solve {} listsprog '(append (cs zero ni) L L))))
     (t/is (u/ok-expr?
-           (sol/solve listsprog '(reverse (cs (succ zero) (cs zero ni))
-                                          (cs zero (cs (succ zero) ni))))))
+           (sol/solve {} listsprog
+                      '(reverse (cs (succ zero) (cs zero ni))
+                                (cs zero (cs (succ zero) ni))))))
     (t/is (u/ko-expr?
-           (sol/solve listsprog '(reverse (cs (succ zero) (cs (zero ni)))
-                                          (cs (succ zero) (cs (zero ni)))))))))
+           (sol/solve {} listsprog
+                      '(reverse (cs (succ zero) (cs (zero ni)))
+                                (cs (succ zero) (cs (zero ni)))))))))

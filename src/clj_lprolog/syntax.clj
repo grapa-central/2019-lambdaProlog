@@ -11,15 +11,25 @@
 ;; A kernel lambda-term is either:
 ;; - a bound variable (identified by its De Bruijn index)
 ;; - a free (substituable) variable (identified by a symbol)
+;; - a string literal
+;; - an int literal
+;; - a boolean literal (true or false)
 ;; - a constant (O, S, +, *, or user-declared)
 ;; - a n-ary λ-abstraction
 ;; - a n-ary application
 ;; - a suspension (used for explicit substitutions)
 ;;}
 
+(def primitives
+  "Primitives of the language"
+  '(+ - * quot mod
+      and or
+      = not=
+      zero? <= < >= >))
+
 (def reserved
   "Reserved symbols"
-  '(λ ∀ => O S + *))
+  (concat '(λ) primitives))
 
 (defn bound?
   "Is `t` a bound variable ?"
@@ -30,21 +40,39 @@
 (defn free?
   "Is `t` a free variable ?"
   [t] (and (symbol? t) (= (symbol (str/capitalize t)) t)
+           (Character/isLetter (first (str t)))
            (not (some #{t} reserved))))
 
 (example (free? 'A) => true)
 
+(defn string-lit?
+  "Is `t` a string literal ?"
+  [t] (string? t))
+
+(example (string-lit? "hello") => true)
+
+(defn int-lit?
+  "Is `t` an integer literal ?"
+  [t] (int? t))
+
+(example (int-lit? 42) => true)
+
+(defn boolean-lit?
+  "Is `t` a boolean literal ?"
+  [t] (boolean? t))
+
+(example (boolean-lit? true) => true)
+
 (defn primitive?
   "Is `t` a primitive constant ?"
-  [t] (some? (some #{t} (nthrest reserved 2))))
+  [t] (some? (some #{t} primitives)))
 
-(examples
- (primitive? 'S) => true
- (primitive? '+) => true)
+(example (primitive? '+) => true)
 
 (defn user-const?
   "Is `t` a user constant ?"
-  [t] (and (symbol? t) (= (symbol (str/lower-case t)) t)))
+  [t] (and (symbol? t) (= (symbol (str/lower-case t)) t)
+           (not (some #{t} reserved))))
 
 (example (user-const? 'zero) => true)
 
@@ -83,8 +111,10 @@
 ;;
 ;; A type is either
 ;; - a type variable (identified by an capitalized symbol)
-;; - the primitive "nat" type `i`
 ;; - the primitive "prop" type `o`
+;; - the primitive "int" type `int`
+;; - the primitive "string" type `string`
+;; - the primitive "boolean" type `boolean`
 ;; - a user type
 ;; - a n-ary arrow type
 ;;}
@@ -95,17 +125,29 @@
 
 (example (type-var? 'A) => true)
 
-(defn nat-type?
-  "Is `t` the nat type ?"
-  [t] (= t 'i))
-
-(example (nat-type? 'i) => true)
-
 (defn prop-type?
   "Is `t` the proposition type ?"
   [t] (= t 'o))
 
 (example (prop-type? 'o) => true)
+
+(defn int-type?
+  "Is `t` the int type ?"
+  [t] (= t 'int))
+
+(example (int-type? 'int) => true)
+
+(defn boolean-type?
+  "Is `t` the boolean type ?"
+  [t] (= t 'boolean))
+
+(example (boolean-type? 'boolean) => true)
+
+(defn string-type?
+  "Is `t` the string type ?"
+  [t] (= t 'string))
+
+(example (string-type? 'string) => true)
 
 (defn user-type?
   "Is `t` a user type ?"
@@ -174,11 +216,12 @@
 ;; - An applied predicate
 ;; - A pi abstraction : Π (x :> ty) body
 ;; - An implication : p => body
+;; - A print directive : print t
 ;;}
 
 (defn pred?
   "Is `t` a predicate (either defined or free variable) ?"
-  [t] (symbol? t))
+  [t] (and (symbol? t) (not (some #{t} reserved))))
 
 (example (pred? 'even) => true)
 
@@ -199,6 +242,14 @@
   [t] (and (seq? t) (> (count t) 2) (= 'Π (first t))))
 
 (example (pi? '(Π (x :> term) (=> (infer x A) (infer (M x) B)))) => true)
+
+(defn print?
+  "Is `t` a print directive ?"
+  [t] (and (seq? t) (= (count t) 2) (= 'print (first t))))
+
+(defn read?
+  "Is `t` a read directive ?"
+  [t] (and (seq? t) (= (count t) 2) (= 'read (first t)) (free? (second t))))
 
 (defn clause-body?
   "Is `t` a clause body ?"

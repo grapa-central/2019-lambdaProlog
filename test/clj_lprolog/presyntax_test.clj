@@ -24,7 +24,8 @@
   (t/is (syn/proper-kernel-term? #{1}))
   (t/is (syn/proper-kernel-term? 'A))
   (t/is (syn/proper-kernel-term? '(λ 2 (#{1} #{2}))))
-  (t/is (syn/proper-kernel-term? '(A B))))
+  (t/is (syn/proper-kernel-term? '(A B)))
+  (t/is (syn/proper-kernel-term? '(print "hello world"))))
 
 ;; Tests on proper type syntax
 
@@ -88,6 +89,11 @@
     (t/is (not (syn/user-type-dec? 'A)))
     (t/is (not (syn/user-type-dec? '(list (list A)))))
     (t/is (not (syn/user-type-dec? '(pair a b))))))
+
+(t/deftest parse-goal-test
+  (t/is (u/ok-expr? (syn/parse-goal '(even O))))
+  (t/is (u/ok-expr? (syn/parse-goal '(Π (n :> i) (=> (P n) (P (S (S n))))))))
+  (t/is (u/ok-expr? (syn/parse-goal '(print (λ [x] x))))))
 
 (t/deftest parse-clause-test
   (t/testing "positive"

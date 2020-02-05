@@ -35,23 +35,25 @@
 (t/deftest defpred-test
   (t/testing "even"
     (do (lp/start)
-        (lp/defpred 'even '(-> i o))
-        (t/is (= @lp/progpreds {'even ['(-> i o) '()]}))))
+        (lp/defpred 'even '(-> int o))
+        (t/is (= @lp/progpreds {'even ['(-> int o) '()]}))))
   (t/testing "even and odd"
     (do (lp/start)
-        (lp/defpred 'even '(-> i o))
-        (lp/defpred 'odd '(-> i o))
+        (lp/defpred 'even '(-> int o))
+        (lp/defpred 'odd '(-> int o))
         (t/is (= (get @lp/progpreds 'even) (get @lp/progpreds 'odd))))))
 
 (t/deftest addclause-test
   (t/testing "even"
     (do (lp/start)
-        (lp/defpred 'even '(-> i o))
-        (lp/addclause '((even O)))
-        (lp/addclause '((even (S (S N))) :- (even N)))
-        (t/is (= @lp/progpreds {'even ['(-> i o)
-                                        '([(even O) ()]
-                                          [(even (S (S N))) ((even N))])]}))))
+        (lp/defconst 'succ '(-> int int))
+        (lp/defpred 'even '(-> int o))
+        (lp/addclause '((even 0)))
+        (lp/addclause '((even (succ (succ N))) :- (even N)))
+        (t/is (= {'even ['(-> int o)
+                         '([(even 0) ()]
+                           [(even (succ (succ N))) ((even N))])]}
+              @lp/progpreds))))
   (t/testing "is the identity"
     (do
       (lp/start)

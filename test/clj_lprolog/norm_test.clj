@@ -60,8 +60,17 @@
 
 ;; Tests on normalization
 
+(t/deftest evaluable?-test
+  (t/testing "positive"
+    (t/is (nor/evaluable? '(+ 3 4)))
+    (t/is (nor/evaluable? '(* (+ 1 2) (+ 3 4)))))
+  (t/testing "negative"
+    (t/is (not (nor/evaluable? '(+ 3 A))))
+    (t/is (not (nor/evaluable? (second (typ/elaborate-term {} '(+ 3))))))))
+
 (t/deftest simplify-term-test
   (t/is (= 'S (nor/simplify-term '(λ 0 (λ 0 S)))))
+  (t/is (= 12 (nor/simplify-term '((λ 1 (+ 5 #{0})) 7))))
   (t/is (= 'S (nor/simplify-term '(((((((((((((((((((S)))))))))))))))))))))))
 
 (t/deftest lift-indices-test
@@ -71,11 +80,12 @@
   (t/is (= '((λ 1 #{2}) #{1}) (nor/lift-indices 1 '((λ 1 #{1}) #{0})))))
 
 (defn eta
-  [t] (nor/norm-eta (second (typ/elaborate-term {} t))))
+  [t] (nor/norm-eta (second (typ/elaborate-term '{succ (-> int int)} t))))
 
 (t/deftest norm-eta-test
   (t/is (= '(λ 2 #{0}) (eta '(λ 2 #{0}))))
-  (t/is (= '(λ 1 (S #{0})) (eta '(λ 0 S))))
+  (t/is (= '(λ 1 (succ #{0}))
+           (eta '(λ 0 succ))))
   (t/is (= '(λ 3 ((λ 2 (S #{0})) #{1} #{0})) (eta '(λ 1 (λ 2 (S #{0})))))))
 
 (defn normalize

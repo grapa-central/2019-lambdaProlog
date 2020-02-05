@@ -25,13 +25,13 @@
 (defn instantiate-term
   "Instantiate the term `t` by suffixing free-variables with `count`"
   [count t]
-  (with-meta
+  (typ/set-type
     (cond
       (syn/free? t) (instantiate-free-var count t)
       (syn/lambda? t) (list 'λ (second t) (instantiate-term count (nth t 2)))
       (syn/application? t) (map (fn [t] (instantiate-term count t)) t)
       :else t)
-    {:ty (typ/type-of t)}))
+    (typ/type-of t)))
 
 (defn instantiate-pred
   "Instantiate the predicate `p` by suffixing free-variables with `count`"
@@ -70,13 +70,13 @@
 (defn instantiatepi-term
   "Instantiate the term `t` by suffixing occurences of `x` with `count`"
   [x count t]
-  (with-meta
+  (typ/set-type
     (cond
       (and (syn/user-const? t) (= t x)) (instantiatepi-const count x)
       (syn/lambda? t) (list 'λ (second t) (instantiatepi-term x count (nth t 2)))
       (syn/application? t) (map (fn [t] (instantiatepi-term x count t)) t)
       :else t)
-    {:ty (typ/type-of t)}))
+    (typ/type-of t)))
 
 (defn instantiatepi-pred
   "Instantiate the predicate `p` by suffixing occurences of `x` with `count`"
@@ -108,6 +108,20 @@
  (instantiatepi-clause 'x 42 '[(even (succ x)) ((odd N))])
  => '[(even (succ x_42)) ((odd N))])
 
+(defn get-instantiated-vars
+  "Get the set of instantiated vars in `t`"
+  [t] (cond
+        (and (syn/free? t) (str/includes? (str t) "_")) #{t}
+        (syn/lambda? t) (get-instantiated-vars (nth t 2))
+        (syn/application? t)
+        (reduce (fn [s t] (clojure.set/union s (get-instantiated-vars t))) #{} t)
+        :else #{}))
+
+(defn dynamic-clause?
+  "Check if the clause was added dynamically by an implication, ie if it
+  doesn't have a tail or contains instantiated variables"
+  [[hd tl]] (and (empty? tl) (not (empty? (get-instantiated-vars hd)))))
+
 ;;{
 ;; # Solving algorithm
 ;;
@@ -134,6 +148,9 @@
   Also manipulates the fresh-variable counter `cnt`"
   [clauses req si cnt]
   (ok>
+   ;; Apply the substitution to dynamic clauses
+   (map (fn [[hd tl]] [(if (dynamic-clause? [hd tl])
+                        (uni/apply-subst si hd) hd) tl]) clauses) :as clauses
    ;; Instantiate fresh variable names
    (reduce
     (fn [[clauses cnt] cl] [(cons (instantiate-clause cnt cl) clauses) (inc cnt)])
@@ -147,34 +164,47 @@
 
 (defn solve-body
   "Solve the clause body `b` in the context of the program `prog`"
-  [prog [si req] cnt]
+  [consts prog [si req] cnt]
   (cond (empty? req) [:ok si]
         ;; Pi-abstraction : instantiate the constants with a fresh identifier
         (syn/pi? (first req))
         (ok> (first (second (first req))) :as x
              (instantiatepi-clause-body x cnt (nth (first req) 2)) :as req1
              (rest req) :as req2
-             (solve-body prog [si (concat req1 req2)] (inc cnt)))
+             (solve-body consts prog [si (concat req1 req2)] (inc cnt)))
         ;; Implication : add a dynamic clause to the program
         (syn/imp? (first req))
-        (ok> (uni/apply-subst si (second (first req))) :as assump
+        (ok> (second (first req)) :as assump
              (nth (first req) 2) :as req1
              (rest req) :as req2
              (get prog (first assump)) :as [ty clauses]
              (cons [assump '()] clauses) :as clauses
              (assoc prog (first assump) [ty clauses]) :as prog
-             (solve-body prog [si (concat req1 req2)] (inc cnt)))
+             (solve-body consts prog [si (concat req1 req2)] (inc cnt)))
+        ;; Print : well, print the term (after applying substitution)
+        (syn/print? (first req))
+        (ok> (second (first req)) :as t
+             (println (uni/apply-subst si t))
+             (solve-body consts prog [si (rest req)] cnt))
+        ;; Read : read a term from the user, type-check it and use it
+        (syn/read? (first req))
+        (ok> (second (first req)) :as v
+             (read) :as t
+             (typ/check-and-elaborate-term consts t (typ/type-of v)) :as [_ t]
+             [:ko> 'typecheck-read {:t t}]
+             (uni/compose-subst si {v t}) :as [_ si]
+             (solve-body consts prog [si (rest req)] cnt))
         ;; Solve an applied predicate
-        (syn/applied-pred? (first req)) (solve prog [si req] cnt)))
+        (syn/applied-pred? (first req)) (solve consts prog [si req] cnt)))
 
 (defn solve
   "Solve `req` in the context of the program `prog`"
-  ([prog req]
-   (ok> (solve-body prog [{} (list req)] 0) :as [_ subst]
+  ([consts prog req]
+   (ok> (solve-body consts prog [{} (list req)] 0) :as [_ subst]
         (uni/get-freevars req) :as freevars
         [:ok (u/map-of-pair-list
               (map (fn [x] [x (uni/apply-subst subst x)]) freevars))]))
-  ([prog [si req] cnt]
+  ([consts prog [si req] cnt]
    (ok>
     ;; Let's try to solve the first constraint
     (uni/apply-subst si (first req)) :as scrut
@@ -189,12 +219,12 @@
     ;; Recursive calls (return the first correct one)
     (some
      (fn [[si cl]]
-       (let [res (solve-body prog [si (concat cl (rest req))] cnt)]
+       (let [res (solve-body consts prog [si (concat cl (rest req))] cnt)]
          (when (u/ok-expr? res) (second res))))
      poss) :as ress
     (when (nil? ress) [:ko 'solve {:req req}])
     [:ok ress])))
 
 (example
- (solve '{even [(-> nat o) {(even zero) (), (even (succ (succ N))) ((even N))}]}
+ (solve {} '{even [(-> nat o) {(even zero) (), (even (succ (succ N))) ((even N))}]}
        '(even (succ (succ (succ N))))) => '[:ok {N (succ zero)}])

@@ -23,13 +23,11 @@
   (t/testing "positive"
     (t/is (syn/free? 'A)))
   (t/testing "negative"
-    (t/is (not (syn/free? 'S)))
     (t/is (not (syn/free? 12)))
     (t/is (not (syn/free? ())))))
 
 (t/deftest primitive?-test
   (t/testing "positive"
-    (t/is (syn/primitive? 'S))
     (t/is (syn/primitive? '+)))
   (t/testing "negative"
     (t/is (not (syn/primitive? '∀)))
@@ -63,13 +61,6 @@
   (t/testing "negative"
     (t/is (not (syn/type-var? 'a)))
     (t/is (not (syn/type-var? '())))))
-
-(t/deftest nat-type?-test
-  (t/testing "positive"
-    (t/is (syn/nat-type? 'i)))
-  (t/testing "negative"
-    (t/is (not (syn/nat-type? 'I)))
-    (t/is (not (syn/nat-type? '())))))
 
 (t/deftest prop-type?-test
   (t/testing "positive"
@@ -129,6 +120,19 @@
     (t/is (syn/applied-pred? '(p A))))
   (t/testing "negative"
     (t/is (not (syn/applied-pred? '(() O))))))
+
+(t/deftest print?-test
+  (t/testing "positive"
+    (t/is (syn/print? '(print (λ [x] x)))))
+  (t/testing "negative"
+    (t/is (not (syn/print? '(prin A))))))
+
+(t/deftest read?-test
+  (t/testing "positive"
+    (t/is (syn/read? '(read A))))
+  (t/testing "negative"
+    (t/is (not (syn/read? '(rea A))))
+    (t/is (not (syn/read? '(read (λ [x] x)))))))
 
 (t/deftest clause-body?-test
   (t/testing "positive"

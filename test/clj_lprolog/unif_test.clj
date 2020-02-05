@@ -46,7 +46,7 @@
   (t/testing "negative"
     (t/is (not (uni/unif-var? '(λ 1 (A)))))
     (t/is (not (uni/unif-var? '(λ 0 (A B)))))
-    (t/is (not (uni/unif-var? '(λ 0 (O)))))))
+    (t/is (not (uni/unif-var? '(λ 0 (0)))))))
 
 (t/deftest trivial-test
   (t/is (= '() (uni/trivial '([(λ 0 (#{0})) (λ 0 (A))]))))
@@ -58,7 +58,7 @@
   (t/testing "positive"
     (t/is (= '[:ok () {A zero}] (uni/simpl '([(λ 0 (zero)) (λ 0 (A))]))))
     (t/is (= '[:ok ([(λ 2 (A)) (λ 2 (#{1}))]) {}]
-             (uni/simpl '([(λ 2 (S A)) (λ 2 (S #{1}))])))))
+             (uni/simpl '([(λ 2 (succ A)) (λ 2 (succ #{1}))])))))
   (t/testing "negative"
     (t/is (u/ko-expr? (uni/simpl '([(λ 2 (#{0})) (λ 2 (#{1}))]))))))
 

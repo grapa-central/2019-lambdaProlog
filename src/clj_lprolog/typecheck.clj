@@ -14,8 +14,10 @@
 (defn valid-type?
   "Check that `ty` is built from primitive and user-defined types"
   [types ty] (cond
-               (syn/nat-type? ty) :ok
                (syn/prop-type? ty) :ok
+               (syn/string-type? ty) :ok
+               (syn/int-type? ty) :ok
+               (syn/boolean-type? ty) :ok
                (syn/user-type? ty)
                (if (contains? types ty) :ok [:ko 'check-type {:ty ty}])
                (syn/arrow-type? ty)
@@ -28,7 +30,7 @@
                  [:ko 'check-type {:ty ty}])
                ))
 
-(example (valid-type? '#{bool} '(-> i bool)) => :ok)
+(example (valid-type? '#{bool} '(-> int bool)) => :ok)
 
 (defn check-const
   "Check that the constant `c` use types declared in `types`"
@@ -112,7 +114,7 @@
 (defn compose-subst
   "Compose two substitutions `s1` and `s2`, after checking that they dont clash"
   [s1 s2] (ok> (when (subst-clash? s1 s2) [:ko> 'subst-clash {:s1 s1 :s2 s2}])
-               [:ok (conj s1 (apply-subst-subst s1 s2))]))
+               [:ok (conj (apply-subst-subst s2 s1) (apply-subst-subst s1 s2))]))
 
 (examples
  (compose-subst {'ty1 'i} {'ty2 'o}) =>
@@ -182,7 +184,13 @@
 
 (def primitive-env
   "Types of primitives"
-  { 'O 'i 'S '(-> i i) '+ '(-> i i i) '* '(-> i i i) })
+  '{ + (-> int int int) - (-> int int int) * (-> int int int)
+    quot (-> int int int) mod (-> int int int)
+    and (-> boolean boolean boolean) or (-> boolean boolean boolean)
+    = (-> A A boolean) not= (-> A A boolean)
+    zero? (-> int boolean)
+    <= (-> int int boolean) < (-> int int boolean)
+    >= (-> int int boolean) > (-> int int boolean)})
 
 (defn rename-type-vars
   "Change the type variables in `ty` into type-unification variables
@@ -195,6 +203,22 @@
            :else ty))
 
 (example (rename-type-vars 42 '(-> A B A)) => '(-> TyA42 TyB42 TyA42))
+
+(defn type-of
+  "Retrieve type information for an elaborated term `t`"
+  [t] (cond
+        (syn/string-lit? t) 'string
+        (syn/int-lit? t) 'int
+        (syn/boolean-lit? t) 'boolean
+        :else (get (meta t) :ty)))
+
+(defn set-type
+  "Set the type information for a term `t`"
+  [t ty] (cond
+           (syn/string-lit? t) t
+           (syn/int-lit? t) t
+           (syn/boolean-lit? t) t
+           :else (with-meta t {:ty ty})))
 
 (defn subst-infer-term
   "Infer the type of `t`.
@@ -215,22 +239,31 @@
       (when (>= (first t) (count env))
         [:ko> 'outside-env {:n (first t) :env env}])
       (nth env (first t)) :as ty
-      [:ok {} ty (with-meta t {:ty ty}) cnt])
+      [:ok {} ty (set-type t ty) cnt])
 
      ;; t is a free variable
      (syn/free? t) (let [ty (fresh-tvar cnt)]
-                     [:ok {} ty (with-meta t {:ty ty}) (inc cnt)])
+                     [:ok {} ty (set-type t ty) (inc cnt)])
+
+     ;; t is a string literal
+     (syn/string-lit? t) [:ok {} 'string t cnt]
+
+     ;; t is an integer literal
+     (syn/int-lit? t) [:ok {} 'int t cnt]
+
+     ;; t is a boolean literal
+     (syn/boolean-lit? t) [:ok {} 'boolean t cnt]
 
      ;; t is a primitive
      (syn/primitive? t)
-     (ok> (get primitive-env t) :as ty
-          [:ok {} ty (with-meta t {:ty ty}) cnt])
+     (ok> (rename-type-vars cnt (get primitive-env t)) :as ty
+          [:ok {} ty (set-type t ty) (inc cnt)])
 
      ;; t is a user constant
      (syn/user-const? t)
      (ok> (when (not (contains? consts t)) [:ko 'user-const {:const t}])
           (rename-type-vars cnt (get consts t)) :as ty
-          [:ok {} ty (with-meta t {:ty ty}) (inc cnt)])
+          [:ok {} ty (set-type t ty) (inc cnt)])
 
      ;; t is a lambda-abstraction
      (syn/lambda? t)
@@ -244,7 +277,7 @@
           (concat (if (seq? ty1)
                     (cons '-> ty1)
                     (list '-> ty1)) (list ty2))) :as ty
-      [:ok si ty (with-meta (list 'λ (second t) t') {:ty ty}) cnt])
+      [:ok si ty (set-type (list 'λ (second t) t') ty) cnt])
 
      ;; t is an application
      (syn/application? t)
@@ -267,7 +300,7 @@
       [:ko 'type-infer-app {:t t}]
       (compose-subst si sihdtl) :as [_ si']
       [:ko 'type-infer-app {:t t}]
-      [:ok si' ty (with-meta (cons hd' tl') {:ty ty}) (inc cnt)]))))
+      [:ok si' ty (set-type (cons hd' tl') ty) (inc cnt)]))))
 
 (defn infer-term
   "Infer the type of `t`"
@@ -277,30 +310,30 @@
         [:ok ty])))
 
 (examples
- (infer-term '+) => [:ok '(-> i i i)]
+ (infer-term '+) => [:ok '(-> int int int)]
  (infer-term '(λ 2 #{0})) => [:ok '(-> Ty0 Ty1 Ty1)]
  (infer-term '((λ 2 #{1}) (λ 1 #{0}))) => [:ok '(-> Ty1 Ty2 Ty2)]
- (infer-term '((λ 1 #{0}) (S O))) => [:ok 'i])
+ (infer-term '((λ 1 #{0}) 0)) => [:ok 'int])
 
 (defn apply-subst-metadata
   "Apply a substitution `si` in the metadata of `t`"
   [si t]
   (cond
     (syn/lambda? t)
-    (with-meta (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
-      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
+    (set-type (list 'λ (second t) (apply-subst-metadata si (nth t 2)))
+      (syn/normalize-ty (apply-subst-ty si (type-of t))))
     (syn/application? t)
-    (with-meta (map (fn [t] (apply-subst-metadata si t)) t)
-      {:ty (syn/normalize-ty (apply-subst-ty si (get (meta t) :ty)))})
-    :else (vary-meta t (fn [me] {:ty (syn/normalize-ty
-                                     (apply-subst-ty si (get me :ty)))}))
-    ))
+    (set-type (map (fn [t] (apply-subst-metadata si t)) t)
+              (syn/normalize-ty (apply-subst-ty si (type-of t))))
+    :else (set-type t (syn/normalize-ty (apply-subst-ty si (type-of t))))))
 
 (defn elaborate-term
   "Elaborate a term with its type information"
-  ([consts t]
-   (ok> (subst-infer-term consts t) :as [_ si _ t]
-        [:ok (apply-subst-metadata si t)])))
+  ([consts t] (ok> (elaborate-term consts t 0) :as [_ t cnt]
+                   [:ok t]))
+  ([consts t cnt]
+   (ok> (subst-infer-term consts t cnt) :as [_ si _ t cnt]
+        [:ok (apply-subst-metadata si t) cnt])))
 
 (defn check-and-elaborate-term
   "Check that `t` has type `ty`,
@@ -314,10 +347,6 @@
         [:ko 'check-term {:t t :ty ty}]
         (compose-subst si si2) :as [_ si]
         [:ok (apply-subst-metadata si t) cnt])))
-
-(defn type-of
-  "Retrieve type information for an elaborated term `t`"
-  [t] (get (meta t) :ty))
 
 ;;{
 ;; Type checking and elaboration of a whole program
@@ -373,7 +402,7 @@
             [:ok [(cons t res) cnt]]))
      ['() cnt] (map vector (rest p) params)) :as [_ [tl cnt]]
     [:ko> 'elaborate-pred {:pred p}]
-    [:ok (cons (with-meta (first p) {:ty ty}) (reverse tl)) cnt])))
+    [:ok (cons (set-type (first p) ty) (reverse tl)) cnt])))
 
 (declare elaborate-clause-body)
 
@@ -388,13 +417,23 @@
      (check-const types [c ty]) :as _
      (elaborate-clause-body
       types (assoc consts c ty) prog (nth g 2) cnt) :as [_ body]
-     [:ok (list 'Π (second g) body)])
+     [:ok (list 'Π (second g) body) cnt])
     ;; The goal is an implication
     (syn/imp? g)
     (ok>
      (elaborate-pred consts prog (second g) cnt) :as [_ hd cnt]
      (elaborate-clause-body types consts prog (nth g 2) cnt) :as [_ tl cnt]
-     [:ok (list '=> hd tl)])
+     [:ok (list '=> hd tl) cnt])
+    ;; The goal is a print directive
+    (syn/print? g)
+    (ok>
+     (elaborate-term consts (second g) cnt) :as [_ t cnt]
+     [:ok (list 'print t) cnt])
+    ;; The goal is a read directive
+    (syn/read? g)
+    (ok>
+     (elaborate-term consts (second g) cnt) :as [_ t cnt]
+     [:ok (list 'read t) cnt])
     ;; The goal is an applied predicate
     (syn/applied-pred? g) (elaborate-pred consts prog g cnt)
     ;; Either a non well-formed term, or we forgot to implement something :p
@@ -441,8 +480,7 @@
                                (combine-env e1 e2)))
                 (if (syn/free? (first t)) {(first t) ty} {})
                 (rest t))
-   [:ko> 'check-freevar-pred {:pred t}]
-   ))
+   [:ko> 'check-freevar-pred {:pred t}]))
 
 (defn elaborate-and-freevar-pred
   "Elaborate an applied predicate `t`, and get its freevar types,
@@ -453,8 +491,9 @@
        [:ok t vars]))
 
 (example
- (elaborate-and-freevar-pred {} {'even ['(-> i o)]} '(even (S N)))
- => [:ok '(even (S N)) {'N 'i}])
+ (elaborate-and-freevar-pred '{succ (-> int int)} {'even ['(-> int o)]}
+                             '(even (succ N)))
+ => [:ok '(even (succ N)) {'N 'int}])
 
 (declare check-freevar-clause-body)
 
@@ -469,6 +508,14 @@
     (ok> (check-freevar-pred (second g)) :as [_ fvt2]
          (combine-env fvt fvt2) :as [_ fvt]
          (check-freevar-clause-body (nth g 2) fvt))
+    ;; The goal is a print directive
+    (syn/print? g)
+    (ok> (get-freevar-types (second g)) :as [_ fvt2]
+         (combine-env fvt fvt2))
+    ;; The goal is a read directive
+    (syn/read? g)
+    (ok> (get-freevar-types (second g)) :as [_ fvt2]
+         (combine-env fvt fvt2))
     ;; The goal is an applied predicate
     (syn/applied-pred? g)
     (ok> (check-freevar-pred g) :as [_ fvt2]
@@ -490,17 +537,59 @@
        (check-freevar-clause-body (second c) fvt)
        [:ko> 'check-freevar-clause {:clause c :fvt fvt}]))
 
+(defn apply-freevar-types
+  "Propagate unified freevar types into the term `t`"
+  [vars t] (cond
+             (syn/free? t)
+             (if-let [ty (get vars t)] (set-type t (syn/normalize-ty ty)) t)
+             (syn/lambda? t)
+             (set-type
+              (list 'λ (second t) (apply-freevar-types vars (nth t 2)))
+              (type-of t))
+             (syn/application? t)
+             (set-type
+              (map (fn [t] (apply-freevar-types vars t)) t)
+              (type-of t))
+             :else t))
+
+(declare apply-freevar-types-clause-body)
+
+(defn apply-freevar-types-goal
+  "Propagate unified freevar types into the goal `g`"
+  [vars g] (cond
+             (syn/pi? g)
+             (list 'Π (second g)
+                   (apply-freevar-types-clause-body vars (nth g 2)))
+             (syn/imp? g)
+             (list '=> (apply-freevar-types vars (second g))
+                   (apply-freevar-types-clause-body vars (nth g 2)))
+             (syn/print? g)
+             (list 'print (apply-freevar-types vars (second g)))
+             (syn/read? g)
+             (list 'read (apply-freevar-types vars (second g)))
+             (syn/applied-pred? g) (apply-freevar-types vars g)))
+
+(defn apply-freevar-types-clause-body
+  "Propagate unified freevar types into the clause body `b`"
+  [vars b] (map (fn [g] (apply-freevar-types-goal vars g)) b))
+
+(defn apply-freevar-types-clause
+  "Propagate unified freevar types into the clause `c`"
+  [vars [hd body]] [(apply-freevar-types vars hd)
+                    (apply-freevar-types-clause-body vars body)])
+
 (defn elaborate-and-freevar-clause
   "Check and get freevar types for an elaborated clause `c`"
   [types consts prog c]
   (ok> (elaborate-clause types consts prog c) :as [_ c]
        (check-freevar-clause prog c) :as [_ vars]
+       (apply-freevar-types-clause vars c) :as c
        [:ok c vars]))
 
 (example
- (elaborate-and-freevar-clause {} {} {'even ['(-> i o)]}
-                               ['(even (S (S N))) '((even N))]) =>
- [:ok ['(even (S (S N))) '((even N))] {'N 'i}])
+ (elaborate-and-freevar-clause {} '{succ (-> int int)} {'even ['(-> int o)]}
+                               ['(even (succ (succ N))) '((even N))]) =>
+ [:ok ['(even (succ (succ N))) '((even N))] {'N 'int}])
 
 (defn elaborate-program
   "Elaborate the whole program `prog`"
@@ -518,12 +607,13 @@
   [types consts prog]
   (ok> (check-consts types consts) :as _
        (check-preds types prog) :as _
-       (elaborate-program types consts prog) :as [_ prog]
-       (u/every-ok?
-        (fn [[_ [_ clauses]]]
-          (u/every-ok? (fn [c] (check-freevar-clause prog c))
-                       clauses)) prog)
-       [:ok prog]))
+       (u/ok-map
+        (fn [[pred [ty clauses]]]
+          (ok> (u/ok-map (fn [c] (elaborate-and-freevar-clause types consts prog c))
+                         clauses) :as [_ clauses]
+               [:ok [pred [ty (map (fn [[t]] t) clauses)]]]))
+        prog) :as [_ prog]
+       [:ok (u/map-of-pair-list (map (fn [[c]] c) prog))]))
 
 (defn type-check-program
   "Returns true if the program is correctly typed, false otherwise"

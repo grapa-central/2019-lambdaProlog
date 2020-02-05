@@ -33,6 +33,9 @@
   "Is `t` a kernel term ?"
   [t] (or (syn/bound? t)
           (syn/free? t)
+          (syn/string-lit? t)
+          (syn/int-lit? t)
+          (syn/boolean-lit? t)
           (syn/primitive? t)
           (syn/user-const? t)
           (proper-lambda? t)
@@ -66,7 +69,9 @@
   "Is `t` a proper type ?"
   [t] (or (syn/type-var? t)
           (syn/prop-type? t)
-          (syn/nat-type? t)
+          (syn/string-type? t)
+          (syn/int-type? t)
+          (syn/boolean-type? t)
           (syn/user-type? t)
           (proper-arrow-type? t)
           (proper-applied-type-constructor? t)))
@@ -89,7 +94,7 @@
   "Is `t` a bound variable or a constant ?"
   [t] (and (symbol? t)
            (not (some #{t} syn/reserved))
-           (not= (symbol (str/capitalize t)) t)))
+           (= (symbol (str/lower-case t)) t)))
 
 (example (bound-or-const? 'x) => true)
 
@@ -105,6 +110,7 @@
   "Is `t` a user term ?"
   [t] (or (bound-or-const? t)
           (syn/free? t)
+          (syn/string-lit? t)
           (syn/primitive? t)
           (lambda? t)
           (syn/application? t)))
@@ -125,7 +131,9 @@
           [:ok t])
 
         (syn/free? t) [:ok t]
-
+        (syn/string-lit? t) [:ok t]
+        (syn/int-lit? t) [:ok t]
+        (syn/boolean-lit? t) [:ok t]
         (syn/primitive? t) [:ok t]
 
         (lambda? t)
@@ -175,20 +183,27 @@
 (defn parse-goal
   "Parse one of the goals `g` in a clause"
   [g] (cond
-        ;; The body is a pi-abstraction
+        ;; The goal is a pi-abstraction
         (syn/pi? g)
         (ok>
          (when (not (proper-typed-binding? (second g))))
          [:ko 'parse-goal {:goal g}]
          (parse-clause-body (nthrest g 2)) :as [_ body]
          [:ok (list 'Π (second g) body)])
-        ;; The body is an implication
+        ;; The goal is an implication
         (syn/imp? g)
         (ok>
          (parse-applied-pred (second g)) :as [_ hd]
          (parse-clause-body (nthrest g 2)) :as [_ body]
          [:ok (list '=> hd body)])
-        ;; The first term of the body is an applied predicate
+        ;; The goal is a print directive
+        (syn/print? g)
+        (ok>
+         (parse (second g)) :as [_ t]
+         [:ok (list 'print t)])
+        ;; The goal is a read directive
+        (syn/read? g) [:ok g]
+        ;; The goal is an applied predicate
         (syn/applied-pred? g) (parse-applied-pred g)
         :else [:ko 'parse-goal {:goal g}]))
 
@@ -228,7 +243,6 @@
 
 (defn user-const-dec?
   "Is `c` a well formed constant declaration with type `ty`"
-  [c ty] (and (symbol? c) (= (symbol (str/lower-case c)) c)
-              (proper-type? ty)))
+  [c ty] (and (syn/user-const? c) (proper-type? ty)))
 
 (example (user-const-dec? 'ni '(list A)) => true)
