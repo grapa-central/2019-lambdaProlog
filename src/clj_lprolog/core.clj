@@ -4,7 +4,8 @@
             [clj-lprolog.syntax :as syn]
             [clj-lprolog.presyntax :as psyn]
             [clj-lprolog.typecheck :as typ]
-            [clj-lprolog.solve :as sol]))
+            [clj-lprolog.solve :as sol]
+            [clj-lprolog.core :as lp]))
 
 ;; Contains the set of user types during execution of the program
 (def progtypes (atom #{}))
@@ -28,7 +29,7 @@
 
 (defmacro deftype
   "Define a type. `n` is the name of the type, it should be lowercase"
-  [ty] `(deftype-fun ~ty))
+  [ty] `(deftype-fun '~ty))
 
 (defn defconst-fun
   [c ty] (if (psyn/user-const-dec? c ty)
@@ -41,7 +42,7 @@
 (defmacro defconst
   "Define a constant `n` (should be lowercase),
   with its type `ty`. Checks well formedness"
-  [c ty] `(defconst-fun ~c ~ty))
+  [c ty] `(defconst-fun '~c '~ty))
 
 (defn defpred-fun
   [p ty] (if (and (syn/pred? p) (psyn/proper-type? ty))
@@ -54,7 +55,7 @@
 (defmacro defpred
   "Define a predicate. `n` is the name of the predicate, and `t` its type
   Also check well-formedness"
-  [p ty] `(defpred-fun ~p ~ty))
+  [p ty] `(defpred-fun '~p '~ty))
 
 (defn addclause-fun
   [clause]
@@ -76,7 +77,7 @@
 (defmacro addclause
   "Add `clause` to a predicate.
    Also checks that the clause is well formed"
-  [clause] `(addclause-fun ~clause))
+  [& clause] `(addclause-fun '~clause))
 
 (defn type-check-program
   "Type check the current program"
@@ -85,8 +86,8 @@
       (deref progconsts)
       (deref progpreds)))
 
-(defn solve
-  "Solve the request `req`"
+(defn solve-fun
+  "Actually solve the request `req`"
   [req] (u/ok>
          (psyn/parse-applied-pred req) :as [_ req]
          [:ko> 'parse-request {:req req}]
@@ -94,3 +95,7 @@
           (deref progconsts) (deref progpreds) req) :as [_ req _]
          [:ko> 'typecheck-request {:req req}]
          (sol/solve (deref progconsts) (deref progpreds) req)))
+
+(defmacro solve
+  "Solve the request `req`"
+  [req] `(lp/solve-fun '~req))
