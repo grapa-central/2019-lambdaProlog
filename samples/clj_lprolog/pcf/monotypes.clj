@@ -5,9 +5,9 @@
 ;; Encoding of types, without polymorphism
 ;;}
 
-(lp/deftype 'ty)
+(lp/deftype ty)
 
-(lp/defconst '--> '(-> ty ty ty))
-(lp/defconst 'lst '(-> ty ty))
-(lp/defconst 'num 'ty)
-(lp/defconst 'bool 'ty)
+(lp/defconst --> (-> ty ty ty))
+(lp/defconst lst (-> ty ty))
+(lp/defconst num ty)
+(lp/defconst bool ty)
