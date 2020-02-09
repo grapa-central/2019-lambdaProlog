@@ -108,7 +108,7 @@
   (t/testing "even"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> int o))
+      (cor/defpred even (-> int o))
       (t/is (= '{A int}
                (nth
                 (typ/elaborate-and-freevar-pred
@@ -116,7 +116,7 @@
   (t/testing "predicate"
     (do
       (cor/start)
-      (cor/defpred 'pred '(-> (-> int o) int o))
+      (cor/defpred pred (-> (-> int o) int o))
       (t/is (= {'F 'o}
                (nth
                 (typ/elaborate-and-freevar-pred
@@ -124,14 +124,14 @@
   (t/testing "predicate fail"
     (do
       (cor/start)
-      (cor/defpred 'pred '(-> (-> int o) int o))
+      (cor/defpred pred (-> (-> int o) int o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-pred
               {} (deref cor/progpreds) '(pred (λ 1 F) F))))))
   (t/testing "used twice"
     (do
       (cor/start)
-      (cor/defpred 'twice '(-> int int o))
+      (cor/defpred twice (-> int int o))
       (t/is (u/ok-expr?
              (typ/elaborate-and-freevar-pred
               {} (deref cor/progpreds) '(twice ((λ 1 O) A) A)))))))
@@ -140,8 +140,8 @@
   (t/testing "oddeven"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> int o))
-      (cor/defpred 'odd '(-> int o))
+      (cor/defpred even (-> int o))
+      (cor/defpred odd (-> int o))
       (t/is (= {'N 'int}
                (nth
                 (typ/elaborate-and-freevar-clause
@@ -150,7 +150,7 @@
   (t/testing "pred"
     (do
       (cor/start)
-      (cor/defpred 'applypred '(-> (-> int o) int o))
+      (cor/defpred applypred (-> (-> int o) int o))
       (t/is (= {'P '(-> int o) 'N 'int}
                (nth
                 (typ/elaborate-and-freevar-clause
@@ -158,8 +158,8 @@
   (t/testing "incoherent"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> int o))
-      (cor/defpred 'odd '(-> o o))
+      (cor/defpred even (-> int o))
+      (cor/defpred odd (-> o o))
       (t/is (u/ko-expr?
              (typ/elaborate-and-freevar-clause
               {} {} (deref cor/progpreds) '((even N) ((odd N)))))))))
@@ -168,13 +168,13 @@
   (t/testing "oddeven"
     (do
       (cor/start)
-      (cor/defpred 'even '(-> int o))
-      (cor/defpred 'odd '(-> int o))
-      (cor/defconst 'succ '(-> int int))
-      (cor/addclause '((even 0)))
-      (cor/addclause '((even (succ N)) :- (odd N)))
-      (cor/addclause '((odd 1)))
-      (cor/addclause '((odd (succ N)) :- (even N)))
+      (cor/defpred even (-> int o))
+      (cor/defpred odd (-> int o))
+      (cor/defconst succ (-> int int))
+      (cor/addclause (even 0))
+      (cor/addclause (even (succ N)) :- (odd N))
+      (cor/addclause (odd 1))
+      (cor/addclause (odd (succ N)) :- (even N))
       (t/is (= [:ok (deref cor/progpreds)]
                (typ/elaborate-program {} (deref cor/progconsts)
                                       (deref cor/progpreds)))))))
@@ -192,13 +192,13 @@
   (t/testing "oddeven"
     (do
       (cor/start)
-      (cor/defconst 'succ '(-> int int))
-      (cor/defpred 'even '(-> int o))
-      (cor/defpred 'odd '(-> int o))
-      (cor/addclause '((even 0)))
-      (cor/addclause '((even (succ N)) :- (odd N)))
-      (cor/addclause '((odd (succ 0))))
-      (cor/addclause '((odd (succ N)) :- (even N)))
+      (cor/defconst succ (-> int int))
+      (cor/defpred even (-> int o))
+      (cor/defpred odd (-> int o))
+      (cor/addclause (even 0))
+      (cor/addclause (even (succ N)) :- (odd N))
+      (cor/addclause (odd (succ 0)))
+      (cor/addclause (odd (succ N)) :- (even N))
       (t/is (= [:ok (deref cor/progpreds)]
                (typ/elaborate-and-check-program #{} '{succ (-> int int)}
                                                 (deref cor/progpreds)))))))
